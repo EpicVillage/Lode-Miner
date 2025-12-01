@@ -3,19 +3,19 @@ import logger from '../../src/utils/logger';
 import { getUserSettings } from './userSettings';
 import { getUserClaimableRewards, claimUserSol, claimUserOrb } from './userOperations';
 import { claimUserStakingRewards } from './userStaking';
-import { formatSOL, formatORB } from './formatters';
+import { formatSOL, formatLODE } from './formatters';
 import { Telegraf } from 'telegraf';
-import { checkAndExecuteOrbTransfer } from './orbAutoTransfer';
+import { checkAndExecuteLodeTransfer } from './lodeAutoTransfer';
 
 /**
  * Auto-Claim & Auto-Transfer Background Service
  *
  * Periodically checks all users' claimable rewards and automatically
  * claims them when thresholds are met. After claiming, also checks
- * and executes auto-transfer if ORB balance exceeds threshold.
+ * and executes auto-transfer if LODE balance exceeds threshold.
  */
 
-const AUTO_CLAIM_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const AUTO_CLAIM_CHECK_INTERVAL = 1 * 60 * 1000; // 1 minute
 let autoClaimInterval: NodeJS.Timeout | null = null;
 let bot: Telegraf | null = null;
 
@@ -121,17 +121,17 @@ async function processUserAutoClaims(telegramId: string): Promise<void> {
       }
     }
 
-    // Check mining ORB threshold
+    // Check mining LODE threshold
     if (settings.auto_claim_orb_threshold > 0 && rewards.miningOrb >= settings.auto_claim_orb_threshold) {
-      logger.info(`[Auto-Claim] ${telegramId}: Mining ORB ${rewards.miningOrb.toFixed(2)} >= threshold ${settings.auto_claim_orb_threshold}`);
+      logger.info(`[Auto-Claim] ${telegramId}: Mining LODE ${rewards.miningOrb.toFixed(2)} >= threshold ${settings.auto_claim_orb_threshold}`);
 
       const result = await claimUserOrb(telegramId);
 
       if (result.success && result.orbAmount) {
-        claimedRewards.push(`${formatORB(result.orbAmount)} from mining`);
-        logger.info(`[Auto-Claim] ${telegramId}: Claimed ${result.orbAmount.toFixed(2)} ORB | ${result.signature}`);
+        claimedRewards.push(`${formatLODE(result.orbAmount)} from mining`);
+        logger.info(`[Auto-Claim] ${telegramId}: Claimed ${result.orbAmount.toFixed(2)} LODE | ${result.signature}`);
       } else {
-        logger.warn(`[Auto-Claim] ${telegramId}: Failed to claim ORB - ${result.error}`);
+        logger.warn(`[Auto-Claim] ${telegramId}: Failed to claim LODE - ${result.error}`);
       }
     }
 
@@ -142,8 +142,8 @@ async function processUserAutoClaims(telegramId: string): Promise<void> {
       const result = await claimUserStakingRewards(telegramId);
 
       if (result.success && result.amount) {
-        claimedRewards.push(`${formatORB(result.amount)} from staking`);
-        logger.info(`[Auto-Claim] ${telegramId}: Claimed ${result.amount.toFixed(2)} ORB staking rewards | ${result.signature}`);
+        claimedRewards.push(`${formatLODE(result.amount)} from staking`);
+        logger.info(`[Auto-Claim] ${telegramId}: Claimed ${result.amount.toFixed(2)} LODE staking rewards | ${result.signature}`);
       } else {
         logger.warn(`[Auto-Claim] ${telegramId}: Failed to claim staking rewards - ${result.error}`);
       }
@@ -214,9 +214,9 @@ async function processUserAutoClaims(telegramId: string): Promise<void> {
 
     // Check and execute auto-transfer after claims (if enabled)
     try {
-      const transferResult = await checkAndExecuteOrbTransfer(telegramId);
+      const transferResult = await checkAndExecuteLodeTransfer(telegramId);
       if (transferResult.transferred) {
-        logger.info(`[Auto-Transfer] ${telegramId}: Transferred ${transferResult.amount?.toFixed(2)} ORB | ${transferResult.signature}`);
+        logger.info(`[Auto-Transfer] ${telegramId}: Transferred ${transferResult.amount?.toFixed(2)} LODE | ${transferResult.signature}`);
       } else if (transferResult.error) {
         logger.warn(`[Auto-Transfer] ${telegramId}: ${transferResult.error}`);
       }

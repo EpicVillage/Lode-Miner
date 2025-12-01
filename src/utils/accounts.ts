@@ -2,10 +2,10 @@ import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { getConnection } from './solana';
 import { config } from './config';
-import { Board, Round, Miner, Stake, Treasury } from '../types';
+import { Board, Round, Miner, Stake, Treasury, Referral, Premine, LodeConfig, Automation } from '../types';
 import logger from './logger';
 
-// PDA seeds (from ORE source code)
+// PDA seeds (from Lode source code)
 const BOARD_SEED = Buffer.from('board');
 const ROUND_SEED = Buffer.from('round');
 const MINER_SEED = Buffer.from('miner');
@@ -13,6 +13,8 @@ const STAKE_SEED = Buffer.from('stake');
 const TREASURY_SEED = Buffer.from('treasury');
 const AUTOMATION_SEED = Buffer.from('automation');
 const CONFIG_SEED = Buffer.from('config');
+const REFERRAL_SEED = Buffer.from('referral');
+const PREMINE_SEED = Buffer.from('premine');
 
 // Helper to deserialize u64 (8 bytes) as BN
 function deserializeU64(buffer: Buffer, offset: number): BN {
@@ -37,7 +39,6 @@ export function calculateAccruedStakingRewards(
   stakeBalance: BN
 ): BN {
   // Read 16-byte buffers as 128-bit little-endian integers
-  // We'll use two 64-bit parts (low and high)
   const treasuryLow = treasuryStakeRewardsFactor.readBigUInt64LE(0);
   const treasuryHigh = treasuryStakeRewardsFactor.readBigUInt64LE(8);
   const treasuryFactor = (treasuryHigh << BigInt(64)) | treasuryLow;
@@ -64,7 +65,7 @@ export function calculateAccruedStakingRewards(
 export function getBoardPDA(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [BOARD_SEED],
-    config.orbProgramId
+    config.lodeProgramId
   );
 }
 
@@ -73,7 +74,7 @@ export function getRoundPDA(roundId: BN): [PublicKey, number] {
   const roundIdBuffer = roundId.toArrayLike(Buffer, 'le', 8);
   return PublicKey.findProgramAddressSync(
     [ROUND_SEED, roundIdBuffer],
-    config.orbProgramId
+    config.lodeProgramId
   );
 }
 
@@ -81,7 +82,7 @@ export function getRoundPDA(roundId: BN): [PublicKey, number] {
 export function getMinerPDA(authority: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [MINER_SEED, authority.toBuffer()],
-    config.orbProgramId
+    config.lodeProgramId
   );
 }
 
@@ -89,7 +90,7 @@ export function getMinerPDA(authority: PublicKey): [PublicKey, number] {
 export function getStakePDA(authority: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [STAKE_SEED, authority.toBuffer()],
-    config.orbProgramId
+    config.lodeProgramId
   );
 }
 
@@ -97,7 +98,7 @@ export function getStakePDA(authority: PublicKey): [PublicKey, number] {
 export function getTreasuryPDA(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [TREASURY_SEED],
-    config.orbProgramId
+    config.lodeProgramId
   );
 }
 
@@ -105,7 +106,7 @@ export function getTreasuryPDA(): [PublicKey, number] {
 export function getAutomationPDA(authority: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [AUTOMATION_SEED, authority.toBuffer()],
-    config.orbProgramId
+    config.lodeProgramId
   );
 }
 
@@ -113,7 +114,23 @@ export function getAutomationPDA(authority: PublicKey): [PublicKey, number] {
 export function getConfigPDA(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [CONFIG_SEED],
-    config.orbProgramId
+    config.lodeProgramId
+  );
+}
+
+// Get Referral PDA for a specific authority (Lode-specific)
+export function getReferralPDA(authority: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [REFERRAL_SEED, authority.toBuffer()],
+    config.lodeProgramId
+  );
+}
+
+// Get Premine PDA (singleton, Lode-specific)
+export function getPreminePDA(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [PREMINE_SEED],
+    config.lodeProgramId
   );
 }
 
@@ -123,17 +140,18 @@ export async function fetchEntropyVarAddress(): Promise<PublicKey> {
   const [configPDA] = getConfigPDA();
 
   const accountInfo = await connection.getAccountInfo(configPDA);
-  if (!accountInfo || accountInfo.data.length < 144) {
+  if (!accountInfo || accountInfo.data.length < 168) {
     throw new Error('Config account not found or invalid');
   }
 
-  // Config structure (from IDL):
+  // Lode Config structure (from IDL):
   // - discriminator: 8 bytes (offset 0)
   // - admin: 32 bytes (offset 8)
   // - bury_authority: 32 bytes (offset 40)
   // - fee_collector: 32 bytes (offset 72)
   // - swap_program: 32 bytes (offset 104)
   // - var_address: 32 bytes (offset 136)
+  // - buffer: 8 bytes (offset 168)
   const varAddress = new PublicKey(accountInfo.data.slice(136, 168));
 
   return varAddress;
@@ -152,6 +170,19 @@ export async function isAutomationInitialized(authority: PublicKey): Promise<boo
   }
 }
 
+// Check if referral account is initialized
+export async function isReferralInitialized(authority: PublicKey): Promise<boolean> {
+  try {
+    const connection = getConnection();
+    const [referralPDA] = getReferralPDA(authority);
+    const accountInfo = await connection.getAccountInfo(referralPDA);
+    return accountInfo !== null && accountInfo.data.length > 0;
+  } catch (error) {
+    logger.debug('Error checking referral account:', error);
+    return false;
+  }
+}
+
 // Fetch and deserialize Board account
 export async function fetchBoard(): Promise<Board> {
   const connection = getConnection();
@@ -166,8 +197,9 @@ export async function fetchBoard(): Promise<Board> {
 
   const data = accountInfo.data;
 
-  // Parse Board structure (based on Rust struct)
-  // Assuming: 8-byte discriminator + roundId (8) + startSlot (8) + endSlot (8)
+  // Parse Board structure (Anchor discriminator + fields)
+  // Discriminator: 8 bytes
+  // round_id: u64, start_slot: u64, end_slot: u64
   const board: Board = {
     roundId: deserializeU64(data, 8),
     startSlot: deserializeU64(data, 16),
@@ -193,33 +225,40 @@ export async function fetchRound(roundId: BN): Promise<Round> {
 
   const data = accountInfo.data;
 
-  // Parse Round structure (based on actual Rust struct from ORE)
+  // Parse Round structure (from Lode IDL)
   // pub struct Round {
   //   pub id: u64,                    // Offset 8
   //   pub deployed: [u64; 25],        // Offset 16-215 (200 bytes)
   //   pub slot_hash: [u8; 32],        // Offset 216-247 (32 bytes)
   //   pub count: [u64; 25],           // Offset 248-447 (200 bytes)
   //   pub expires_at: u64,            // Offset 448
-  //   pub motherlode: u64,            // Offset 456 <-- CORRECT
+  //   pub motherlode: u64,            // Offset 456
   //   pub rent_payer: Pubkey,         // Offset 464
   //   pub top_miner: Pubkey,          // Offset 496
   //   pub top_miner_reward: u64,      // Offset 528
   //   pub total_deployed: u64,        // Offset 536
   //   pub total_vaulted: u64,         // Offset 544
-  //   pub total_winnings: u64,        // Offset 552
+  //   pub total_stake_rewards: u64,   // Offset 552
+  //   pub total_winnings: u64,        // Offset 560
   // }
 
   const round: Round = {
-    id: deserializeU64(data, 8),                // Round ID
-    deployed: deserializeU64Array25(data, 16),  // SOL deployed per square (200 bytes)
-    slotHash: data.slice(216, 248),             // Slot hash (32 bytes)
-    expireSlot: deserializeU64(data, 448),      // Expires at
-    motherload: deserializeU64(data, 456),      // Motherload (CORRECT OFFSET)
-    totalDeployed: deserializeU64(data, 536),   // Total deployed
-    totalWinnings: deserializeU64(data, 552),   // Total winnings
+    id: deserializeU64(data, 8),
+    deployed: deserializeU64Array25(data, 16),
+    slotHash: data.slice(216, 248),
+    count: deserializeU64Array25(data, 248),
+    expireSlot: deserializeU64(data, 448),
+    motherlode: deserializeU64(data, 456),
+    rentPayer: new PublicKey(data.slice(464, 496)),
+    topMiner: new PublicKey(data.slice(496, 528)),
+    topMinerReward: deserializeU64(data, 528),
+    totalDeployed: deserializeU64(data, 536),
+    totalVaulted: deserializeU64(data, 544),
+    totalStakeRewards: deserializeU64(data, 552),
+    totalWinnings: deserializeU64(data, 560),
   };
 
-  logger.debug(`Round ${round.id.toString()}: motherload=${round.motherload.toString()}, totalDeployed=${round.totalDeployed.toString()}`);
+  logger.debug(`Round ${round.id.toString()}: motherlode=${round.motherlode.toString()}, totalDeployed=${round.totalDeployed.toString()}`);
 
   return round;
 }
@@ -239,28 +278,43 @@ export async function fetchMiner(authority: PublicKey): Promise<Miner | null> {
 
   const data = accountInfo.data;
 
-  // Parse Miner structure (based on Rust struct)
+  // Parse Miner structure (from Lode IDL)
+  // pub struct Miner {
+  //   pub authority: Pubkey,              // Offset 8 (32 bytes)
+  //   pub deployed: [u64; 25],            // Offset 40 (200 bytes)
+  //   pub cumulative: [u64; 25],          // Offset 240 (200 bytes)
+  //   pub checkpoint_fee: u64,            // Offset 440 (8 bytes)
+  //   pub checkpoint_id: u64,             // Offset 448 (8 bytes)
+  //   pub last_claim_token_at: i64,       // Offset 456 (8 bytes)
+  //   pub last_claim_sol_at: i64,         // Offset 464 (8 bytes)
+  //   pub rewards_factor: Numeric (i128), // Offset 472 (16 bytes)
+  //   pub rewards_sol: u64,               // Offset 488 (8 bytes)
+  //   pub rewards_token: u64,             // Offset 496 (8 bytes)
+  //   pub refined_token: u64,             // Offset 504 (8 bytes)
+  //   pub round_id: u64,                  // Offset 512 (8 bytes)
+  //   pub lifetime_rewards_sol: u64,      // Offset 520 (8 bytes)
+  //   pub lifetime_rewards_token: u64,    // Offset 528 (8 bytes)
+  // }
   let offset = 8; // Skip discriminator
 
-  // Per IDL: authority(32) + deployed(200) + cumulative(200) + checkpoint_fee(8) + checkpoint_id(8) + ...
   const miner: Miner = {
     authority: new PublicKey(data.slice(offset, offset + 32)),
-    deployed: deserializeU64Array25(data, offset + 32),        // offset 40, 200 bytes (25 * 8)
-    cumulative: deserializeU64Array25(data, offset + 232),     // offset 240, 200 bytes (25 * 8)
-    checkpointFee: deserializeU64(data, offset + 432),         // offset 440 (absolute)
-    checkpointId: deserializeU64(data, offset + 440),          // offset 448 (absolute) - PER IDL
-    lastClaimOreAt: deserializeU64(data, offset + 448),        // offset 456 (absolute), i64
-    lastClaimSolAt: deserializeU64(data, offset + 456),        // offset 464 (absolute), i64
-    rewardsFactor: deserializeU64(data, offset + 464),         // offset 472 (absolute), Numeric=16 bytes but reading first 8
-    rewardsSol: deserializeU64(data, offset + 480),            // offset 488 (absolute), skip 16 for Numeric
-    rewardsOre: deserializeU64(data, offset + 488),            // offset 496 (absolute)
-    refinedOre: deserializeU64(data, offset + 496),            // offset 504 (absolute)
-    roundId: deserializeU64(data, offset + 504),               // offset 512 (absolute) - PER IDL
-    lifetimeRewardsSol: deserializeU64(data, offset + 512),    // offset 520 (absolute)
-    lifetimeRewardsOre: deserializeU64(data, offset + 520),    // offset 528 (absolute)
+    deployed: deserializeU64Array25(data, offset + 32),
+    cumulative: deserializeU64Array25(data, offset + 232),
+    checkpointFee: deserializeU64(data, offset + 432),
+    checkpointId: deserializeU64(data, offset + 440),
+    lastClaimTokenAt: deserializeU64(data, offset + 448),
+    lastClaimSolAt: deserializeU64(data, offset + 456),
+    rewardsFactor: deserializeU64(data, offset + 464), // Just read first 8 bytes of Numeric
+    rewardsSol: deserializeU64(data, offset + 480),
+    rewardsToken: deserializeU64(data, offset + 488),
+    refinedToken: deserializeU64(data, offset + 496),
+    roundId: deserializeU64(data, offset + 504),
+    lifetimeRewardsSol: deserializeU64(data, offset + 512),
+    lifetimeRewardsToken: deserializeU64(data, offset + 520),
   };
 
-  logger.debug(`Miner: roundId=${miner.roundId.toString()}, checkpointId=${miner.checkpointId.toString()}, rewardsSol=${miner.rewardsSol.toString()}, rewardsOre=${miner.rewardsOre.toString()}`);
+  logger.debug(`Miner: roundId=${miner.roundId.toString()}, checkpointId=${miner.checkpointId.toString()}, rewardsSol=${miner.rewardsSol.toString()}, rewardsToken=${miner.rewardsToken.toString()}`);
 
   return miner;
 }
@@ -280,49 +334,33 @@ export async function fetchStake(authority: PublicKey): Promise<Stake | null> {
 
   const data = accountInfo.data;
 
-  // Parse Stake structure (from orb-idl.json)
-  // Fields (after 8-byte discriminator):
-  // - authority: 32 bytes (Pubkey)
-  // - balance: 8 bytes (u64) - staked amount
-  // - last_claim_at: 8 bytes (i64)
-  // - last_deposit_at: 8 bytes (i64)
-  // - last_withdraw_at: 8 bytes (i64)
-  // - rewards_factor: 16 bytes (Numeric/I80F48)
-  // - rewards: 8 bytes (u64) - CLAIMABLE ORB REWARDS!
-  // - lifetime_rewards: 8 bytes (u64)
-  // - is_seeker: 8 bytes (u64)
+  // Parse Stake structure (from Lode IDL)
+  // pub struct Stake {
+  //   pub authority: Pubkey,          // Offset 8 (32 bytes)
+  //   pub balance: u64,               // Offset 40 (8 bytes)
+  //   pub last_claim_at: i64,         // Offset 48 (8 bytes)
+  //   pub last_deposit_at: i64,       // Offset 56 (8 bytes)
+  //   pub last_withdraw_at: i64,      // Offset 64 (8 bytes)
+  //   pub rewards_factor: Numeric,    // Offset 72 (16 bytes)
+  //   pub rewards: u64,               // Offset 88 (8 bytes) - SOL rewards
+  //   pub lifetime_rewards: u64,      // Offset 96 (8 bytes)
+  //   pub is_seeker: u64,             // Offset 104 (8 bytes)
+  // }
   let offset = 8; // Skip discriminator
 
-  const stakeAuthority = new PublicKey(data.slice(offset, offset + 32));
-  offset += 32;
-
-  const balance = deserializeU64(data, offset);
-  offset += 8;
-
-  // Skip timestamps (last_claim_at, last_deposit_at, last_withdraw_at)
-  offset += 8 + 8 + 8; // 24 bytes
-
-  // Read rewards_factor (Numeric = I80F48, 16 bytes)
-  const rewardsFactor = data.slice(offset, offset + 16);
-  offset += 16;
-
-  // Read claimable rewards (ORB only for staking)
-  const rewardsOre = deserializeU64(data, offset);
-  offset += 8;
-
-  const lifetimeRewardsOre = deserializeU64(data, offset);
-
   const stake: Stake = {
-    authority: stakeAuthority,
-    balance,
-    rewardsFactor,
-    rewardsSol: new BN(0), // Staking only gives ORB rewards, not SOL
-    rewardsOre,
-    lifetimeRewardsSol: new BN(0), // Staking only gives ORB rewards
-    lifetimeRewardsOre,
+    authority: new PublicKey(data.slice(offset, offset + 32)),
+    balance: deserializeU64(data, offset + 32),
+    lastClaimAt: deserializeU64(data, offset + 40),
+    lastDepositAt: deserializeU64(data, offset + 48),
+    lastWithdrawAt: deserializeU64(data, offset + 56),
+    rewardsFactor: data.slice(offset + 64, offset + 80),
+    rewards: deserializeU64(data, offset + 80),
+    lifetimeRewards: deserializeU64(data, offset + 88),
+    isSeeker: deserializeU64(data, offset + 96),
   };
 
-  logger.debug(`Stake: balance=${stake.balance.toString()}, claimable ORB=${rewardsOre.toString()}`);
+  logger.debug(`Stake: balance=${stake.balance.toString()}, claimable SOL=${stake.rewards.toString()}`);
 
   return stake;
 }
@@ -341,30 +379,140 @@ export async function fetchTreasury(): Promise<Treasury> {
 
   const data = accountInfo.data;
 
-  // Parse Treasury structure (based on IDL)
+  // Parse Treasury structure (from Lode IDL)
   // pub struct Treasury {
-  //   pub balance: u64,                    // Offset 8
-  //   pub motherlode: u64,                 // Offset 16
-  //   pub miner_rewards_factor: Numeric,   // Offset 24 (16 bytes I80F48)
-  //   pub stake_rewards_factor: Numeric,   // Offset 40 (16 bytes I80F48)
-  //   pub total_staked: u64,               // Offset 56
-  //   pub total_unclaimed: u64,            // Offset 64
-  //   pub total_refined: u64,              // Offset 72
+  //   pub buyback_bl: u64,                // Offset 8
+  //   pub motherlode_bl: u64,             // Offset 16
+  //   pub stake_rw_bl: u64,               // Offset 24
+  //   pub miner_rewards_factor: Numeric,  // Offset 32 (16 bytes)
+  //   pub stake_rewards_factor: Numeric,  // Offset 48 (16 bytes)
+  //   pub total_staked: u64,              // Offset 64
+  //   pub total_unclaimed: u64,           // Offset 72
+  //   pub total_refined: u64,             // Offset 80
   // }
 
   const treasury: Treasury = {
-    balance: deserializeU64(data, 8),              // SOL balance
-    motherlode: deserializeU64(data, 16),          // ORE motherlode (GLOBAL)
-    minerRewardsFactor: data.slice(24, 40),        // Miner rewards factor (I80F48)
-    stakeRewardsFactor: data.slice(40, 56),        // Stake rewards factor (I80F48)
-    totalStaked: deserializeU64(data, 56),         // Total staked
-    totalUnclaimed: deserializeU64(data, 64),      // Total unclaimed
-    totalRefined: deserializeU64(data, 72),        // Total refined
+    buybackBl: deserializeU64(data, 8),
+    motherlodeBl: deserializeU64(data, 16),
+    stakeRwBl: deserializeU64(data, 24),
+    minerRewardsFactor: data.slice(32, 48),
+    stakeRewardsFactor: data.slice(48, 64),
+    totalStaked: deserializeU64(data, 64),
+    totalUnclaimed: deserializeU64(data, 72),
+    totalRefined: deserializeU64(data, 80),
   };
 
-  logger.debug(`Treasury: motherlode=${treasury.motherlode.toString()}, totalStaked=${treasury.totalStaked.toString()}`);
+  logger.debug(`Treasury: motherlodeBl=${treasury.motherlodeBl.toString()}, totalStaked=${treasury.totalStaked.toString()}`);
 
   return treasury;
+}
+
+// Fetch and deserialize Referral account (Lode-specific)
+export async function fetchReferral(authority: PublicKey): Promise<Referral | null> {
+  const connection = getConnection();
+  const [referralPDA] = getReferralPDA(authority);
+
+  logger.debug(`Fetching Referral account: ${referralPDA.toBase58()}`);
+
+  const accountInfo = await connection.getAccountInfo(referralPDA);
+  if (!accountInfo) {
+    logger.debug('Referral account not found (not registered yet)');
+    return null;
+  }
+
+  const data = accountInfo.data;
+
+  // Parse Referral structure (from Lode IDL)
+  // pub struct Referral {
+  //   pub authority: Pubkey,          // Offset 8 (32 bytes)
+  //   pub referrer: Pubkey,           // Offset 40 (32 bytes)
+  //   pub pending_rewards: u64,       // Offset 72 (8 bytes)
+  //   pub claimed_rewards: u64,       // Offset 80 (8 bytes)
+  //   pub created_at: i64,            // Offset 88 (8 bytes)
+  // }
+  let offset = 8;
+
+  const referral: Referral = {
+    authority: new PublicKey(data.slice(offset, offset + 32)),
+    referrer: new PublicKey(data.slice(offset + 32, offset + 64)),
+    pendingRewards: deserializeU64(data, offset + 64),
+    claimedRewards: deserializeU64(data, offset + 72),
+    createdAt: deserializeU64(data, offset + 80),
+  };
+
+  logger.debug(`Referral: referrer=${referral.referrer.toBase58()}, pendingRewards=${referral.pendingRewards.toString()}`);
+
+  return referral;
+}
+
+// Fetch and deserialize Premine account (Lode-specific)
+export async function fetchPremine(): Promise<Premine | null> {
+  const connection = getConnection();
+  const [preminePDA] = getPreminePDA();
+
+  logger.debug(`Fetching Premine account: ${preminePDA.toBase58()}`);
+
+  const accountInfo = await connection.getAccountInfo(preminePDA);
+  if (!accountInfo) {
+    logger.debug('Premine account not found');
+    return null;
+  }
+
+  const data = accountInfo.data;
+
+  // Parse Premine structure (from Lode IDL)
+  // pub struct Premine {
+  //   pub is_enabled: bool,           // Offset 8 (1 byte)
+  //   pub total_collected: u64,       // Offset 9 (8 bytes)
+  // }
+  const premine: Premine = {
+    isEnabled: data[8] === 1,
+    totalCollected: deserializeU64(data, 9),
+  };
+
+  logger.debug(`Premine: isEnabled=${premine.isEnabled}, totalCollected=${premine.totalCollected.toString()}`);
+
+  return premine;
+}
+
+// Fetch and deserialize Automation account
+export async function fetchAutomation(authority: PublicKey): Promise<Automation | null> {
+  const connection = getConnection();
+  const [automationPDA] = getAutomationPDA(authority);
+
+  logger.debug(`Fetching Automation account: ${automationPDA.toBase58()}`);
+
+  const accountInfo = await connection.getAccountInfo(automationPDA);
+  if (!accountInfo) {
+    logger.debug('Automation account not found');
+    return null;
+  }
+
+  const data = accountInfo.data;
+
+  // Parse Automation structure (from Lode IDL)
+  // pub struct Automation {
+  //   pub amount: u64,               // Offset 8
+  //   pub authority: Pubkey,         // Offset 16
+  //   pub balance: u64,              // Offset 48
+  //   pub executor: Pubkey,          // Offset 56
+  //   pub fee: u64,                  // Offset 88
+  //   pub strategy: u64,             // Offset 96
+  //   pub mask: u64,                 // Offset 104
+  // }
+  const automation: Automation = {
+    amount: deserializeU64(data, 8),
+    authority: new PublicKey(data.slice(16, 48)),
+    balance: deserializeU64(data, 48),
+    executor: new PublicKey(data.slice(56, 88)),
+    fee: deserializeU64(data, 88),
+    strategy: deserializeU64(data, 96),
+    mask: deserializeU64(data, 104),
+  };
+
+  logger.debug(`Automation: amount=${automation.amount.toString()}, balance=${automation.balance.toString()}`);
+
+  return automation;
 }
 
 export default {
@@ -374,9 +522,15 @@ export default {
   getStakePDA,
   getTreasuryPDA,
   getAutomationPDA,
+  getConfigPDA,
+  getReferralPDA,
+  getPreminePDA,
   fetchBoard,
   fetchRound,
   fetchMiner,
   fetchStake,
   fetchTreasury,
+  fetchReferral,
+  fetchPremine,
+  fetchAutomation,
 };

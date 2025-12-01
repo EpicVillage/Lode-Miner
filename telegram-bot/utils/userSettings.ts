@@ -217,31 +217,31 @@ export function formatSettingsDisplay(settings: UserSettings): string {
 ⚙️ *Your Mining Settings*
 
 *Mining Configuration:*
-• Motherload Threshold: ${settings.motherload_threshold} ORB
+• Motherload Threshold: ${settings.motherload_threshold} LODE
 • SOL Per Block: ${settings.sol_per_block} SOL
 • Number of Blocks: ${settings.num_blocks} blocks
 
 *Automation:*
 • Budget Allocation: ${settings.automation_budget_percent}%
 • Auto-claim SOL: ≥${settings.auto_claim_sol_threshold} SOL
-• Auto-claim ORB: ≥${settings.auto_claim_orb_threshold} ORB
-• Auto-claim Staking: ≥${settings.auto_claim_staking_threshold} ORB
+• Auto-claim LODE: ≥${settings.auto_claim_orb_threshold} LODE
+• Auto-claim Staking: ≥${settings.auto_claim_staking_threshold} LODE
 
 *Swap Settings:*
 • Auto-swap: ${settings.auto_swap_enabled ? '✅ Enabled' : '❌ Disabled'}
-• Swap Threshold: ${settings.swap_threshold} ORB
-• Min ORB Price: $${settings.min_orb_price}
-• Min ORB to Keep: ${settings.min_orb_to_keep} ORB
-• Min Swap Amount: ${settings.min_swap_amount} ORB
+• Swap Threshold: ${settings.swap_threshold} LODE
+• Min LODE Price: $${settings.min_orb_price}
+• Min LODE to Keep: ${settings.min_orb_to_keep} LODE
+• Min Swap Amount: ${settings.min_swap_amount} LODE
 • Slippage: ${(settings.slippage_bps / 100).toFixed(2)}%
 
 *Staking:*
 • Auto-stake: ${settings.auto_stake_enabled ? '✅ Enabled' : '❌ Disabled'}
-• Stake Threshold: ${settings.stake_threshold} ORB
+• Stake Threshold: ${settings.stake_threshold} LODE
 
 *Auto-Transfer:*
 • Auto-transfer: ${settings.auto_transfer_enabled ? '✅ Enabled' : '❌ Disabled'}
-• Transfer Threshold: ${settings.orb_transfer_threshold} ORB
+• Transfer Threshold: ${settings.orb_transfer_threshold} LODE
 • Recipient: ${settings.transfer_recipient_address ? `\`${settings.transfer_recipient_address.slice(0, 8)}...${settings.transfer_recipient_address.slice(-8)}\`` : 'Not set'}
 `.trim();
 }

@@ -227,11 +227,11 @@ ${profitEmoji} *Net P/L:* ${formatSOL(pnl.netSolPnl)} (${formatPercent(pnl.roiPe
 ${roiEmoji} *ROI:* ${formatPercent(pnl.roiPercent)}
 
 *📊 Income Breakdown:*
-• ORB Earned: ${formatORB(pnl.totalOrbEarned)}
-• ORB Claimed: ${formatORB(pnl.totalOrbClaimed)}
+• LODE Earned: ${formatORB(pnl.totalOrbEarned)}
+• LODE Claimed: ${formatORB(pnl.totalOrbClaimed)}
 • SOL from Mining: ${formatSOL(pnl.totalSolClaimed)}
 • SOL from Swaps: ${formatSOL(pnl.totalSwappedSol)}
-• ORB Swapped: ${formatORB(pnl.totalSwappedOrb)}
+• LODE Swapped: ${formatORB(pnl.totalSwappedOrb)}
 
 *💸 Expense Breakdown:*
 • Total Deployed: ${formatSOL(pnl.totalSolDeployed)}
@@ -241,17 +241,17 @@ ${roiEmoji} *ROI:* ${formatPercent(pnl.roiPercent)}
 
 *💼 Current Holdings:*
 • Wallet SOL: ${formatSOL(pnl.currentSolBalance)}
-• Wallet ORB: ${formatORB(pnl.currentOrbBalance)}
+• Wallet LODE: ${formatORB(pnl.currentOrbBalance)}
 • Automation SOL: ${formatSOL(pnl.currentAutomationBalance)}
 • Claimable SOL: ${formatSOL(pnl.claimableSol)}
-• Claimable ORB: ${formatORB(pnl.claimableOrb)}
-• ORB Value: ${formatUSD(pnl.currentOrbBalance * pnl.currentOrbPriceUsd)}
+• Claimable LODE: ${formatORB(pnl.claimableOrb)}
+• LODE Value: ${formatUSD(pnl.currentOrbBalance * pnl.currentOrbPriceUsd)}
 
 *📈 Performance:*
 • Rounds Participated: ${pnl.roundsParticipated}
 • Total Transactions: ${pnl.totalTransactions}
 • Success Rate: ${formatPercent(pnl.successRate)}
-• Avg ORB Price: ${formatUSD(pnl.avgOrbPriceUsd)}
+• Avg LODE Price: ${formatUSD(pnl.avgOrbPriceUsd)}
 `.trim();
 }
 

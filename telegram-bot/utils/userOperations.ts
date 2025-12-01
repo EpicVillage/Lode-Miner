@@ -6,12 +6,13 @@ import logger from '../../src/utils/logger';
 import { getOrbPrice, swapOrbToSol, getSwapQuote } from '../../src/utils/jupiter';
 import {
   buildClaimSolInstruction,
-  buildClaimOreInstruction,
+  buildClaimTokenInstruction,
   buildDeployInstruction,
   sendAndConfirmTransaction
 } from '../../src/utils/program';
 import { fetchMiner, fetchStake, fetchBoard, fetchRound } from '../../src/utils/accounts';
-import { formatSOL, formatORB } from './formatters';
+import { formatSOL, formatLODE } from './formatters';
+import { LODE_MULTIPLIER, SOL_MULTIPLIER } from '../../src/utils/config';
 
 /**
  * User-specific blockchain operations for telegram bot users
@@ -98,7 +99,7 @@ export async function claimUserSol(
 }
 
 /**
- * Claim ORB rewards from mining for a user
+ * Claim LODE rewards from mining for a user
  */
 export async function claimUserOrb(
   telegramId: string
@@ -111,7 +112,7 @@ export async function claimUserOrb(
 
     const settings = await getUserSettings(telegramId);
 
-    logger.info(`[User Claim] Claiming ORB rewards for ${telegramId}`);
+    logger.info(`[User Claim] Claiming LODE rewards for ${telegramId}`);
 
     // Fetch miner account for mining rewards
     const miner = await fetchMiner(wallet.publicKey);
@@ -120,17 +121,17 @@ export async function claimUserOrb(
       return { success: false, error: 'No miner account found' };
     }
 
-    const miningOrb = Number(miner.rewardsOre) / 1e9;
+    const miningOrb = Number(miner.rewardsToken) / LODE_MULTIPLIER;
 
     if (miningOrb === 0) {
-      return { success: false, error: 'No ORB rewards to claim' };
+      return { success: false, error: 'No LODE rewards to claim' };
     }
 
-    logger.info(`[User Claim] Mining Rewards: ${miningOrb.toFixed(2)} ORB`);
+    logger.info(`[User Claim] Mining Rewards: ${miningOrb.toFixed(2)} LODE`);
 
     // Build and send claim instruction
-    const instruction = await buildClaimOreInstruction(wallet.publicKey);
-    const { signature } = await sendAndConfirmTransaction([instruction], 'Claim ORB', { wallet });
+    const instruction = await buildClaimTokenInstruction(wallet.publicKey);
+    const { signature } = await sendAndConfirmTransaction([instruction], 'Claim LODE', { wallet });
 
     // Record transaction
     await recordTransaction({
@@ -138,16 +139,16 @@ export async function claimUserOrb(
       signature,
       orbAmount: miningOrb,
       status: 'success',
-      notes: `Claimed ${miningOrb.toFixed(2)} ORB for user ${telegramId}`,
+      notes: `Claimed ${miningOrb.toFixed(2)} LODE for user ${telegramId}`,
       walletAddress: wallet.publicKey.toBase58(),
       telegramId,
     });
 
-    logger.info(`[User Claim] Successfully claimed ${miningOrb.toFixed(2)} ORB | ${signature}`);
+    logger.info(`[User Claim] Successfully claimed ${miningOrb.toFixed(2)} LODE | ${signature}`);
 
     return { success: true, orbAmount: miningOrb, signature };
   } catch (error: any) {
-    logger.error('[User Claim] Failed to claim ORB:', error);
+    logger.error('[User Claim] Failed to claim LODE:', error);
     return { success: false, error: error.message };
   }
 }
@@ -167,7 +168,7 @@ export async function claimUserStakingRewards(
       return {
         success: true,
         orbAmount: result.amount,
-        solAmount: 0, // Staking rewards are ORB only
+        solAmount: 0, // Staking rewards are LODE only
         signature: result.signature
       };
     }
@@ -180,7 +181,7 @@ export async function claimUserStakingRewards(
 }
 
 /**
- * Swap ORB to SOL for a user
+ * Swap LODE to SOL for a user
  */
 export async function swapUserOrbToSol(
   telegramId: string,
@@ -194,7 +195,7 @@ export async function swapUserOrbToSol(
 
     const settings = await getUserSettings(telegramId);
 
-    logger.info(`[User Swap] Swapping ${amount.toFixed(2)} ORB to SOL for ${telegramId}`);
+    logger.info(`[User Swap] Swapping ${amount.toFixed(2)} LODE to SOL for ${telegramId}`);
 
     // Validate amount
     if (amount <= 0) {
@@ -202,24 +203,24 @@ export async function swapUserOrbToSol(
     }
 
     if (amount < settings.min_swap_amount) {
-      return { success: false, error: `Minimum swap amount is ${settings.min_swap_amount} ORB` };
+      return { success: false, error: `Minimum swap amount is ${settings.min_swap_amount} LODE` };
     }
 
-    // Check ORB balance
+    // Check LODE balance
     const { getUserBalances } = await import('./userWallet');
     const balances = await getUserBalances(telegramId);
 
     if (!balances || balances.orb < amount) {
-      return { success: false, error: `Insufficient ORB balance. Need ${amount} ORB, have ${balances?.orb.toFixed(2) || 0} ORB` };
+      return { success: false, error: `Insufficient LODE balance. Need ${amount} LODE, have ${balances?.orb.toFixed(2) || 0} LODE` };
     }
 
     // Check price protection
     if (settings.min_orb_price > 0) {
-      const orbPrice = await getOrbPrice();
-      if (orbPrice.priceInUsd < settings.min_orb_price) {
+      const lodePrice = await getOrbPrice();
+      if (lodePrice.priceInUsd < settings.min_orb_price) {
         return {
           success: false,
-          error: `ORB price ($${orbPrice.priceInUsd.toFixed(2)}) below minimum ($${settings.min_orb_price})`
+          error: `LODE price ($${lodePrice.priceInUsd.toFixed(2)}) below minimum ($${settings.min_orb_price})`
         };
       }
     }
@@ -244,12 +245,12 @@ export async function swapUserOrbToSol(
         orbAmount: amount,
         solAmount: result.solReceived || 0,
         status: 'success',
-        notes: `Swapped ${amount.toFixed(2)} ORB → ${result.solReceived?.toFixed(4)} SOL for user ${telegramId}`,
+        notes: `Swapped ${amount.toFixed(2)} LODE → ${result.solReceived?.toFixed(4)} SOL for user ${telegramId}`,
         walletAddress: wallet.publicKey.toBase58(),
         telegramId,
       });
 
-      logger.info(`[User Swap] Successfully swapped ${amount.toFixed(2)} ORB → ${result.solReceived?.toFixed(4)} SOL | ${result.signature}`);
+      logger.info(`[User Swap] Successfully swapped ${amount.toFixed(2)} LODE → ${result.solReceived?.toFixed(4)} SOL | ${result.signature}`);
 
       return { success: true, orbSwapped: amount, solReceived: result.solReceived, signature: result.signature };
     } else {
@@ -300,12 +301,12 @@ export async function deployUserSol(
 
     // Fetch round to get motherload
     const round = await fetchRound(board.roundId);
-    const motherloadOrb = Number(round.motherload) / 1e9;
+    const motherloadSol = Number(round.motherlode) / SOL_MULTIPLIER;
 
-    logger.info(`[User Deploy] Current round: ${roundId}, Motherload: ${motherloadOrb} ORB`);
+    logger.info(`[User Deploy] Current round: ${roundId}, Motherload: ${motherloadSol.toFixed(2)} SOL`);
 
     // Build and send deploy instructions (includes dev fee transfer)
-    const instructions = await buildDeployInstruction(amount, wallet.publicKey);
+    const instructions = await buildDeployInstruction(amount, 25, wallet.publicKey);
     const { signature } = await sendAndConfirmTransaction(instructions, 'Deploy', { wallet });
 
     // Calculate 1% dev fee (100 basis points)
@@ -331,7 +332,7 @@ export async function deployUserSol(
     await recordUserRound(
       telegramId,
       roundId,
-      motherloadOrb,
+      motherloadSol,
       amount,
       deployedSquares.length,
       deployedSquares
@@ -371,14 +372,15 @@ export async function getUserClaimableRewards(
     const miner = await fetchMiner(wallet.publicKey);
     if (miner) {
       miningSol = Number(miner.rewardsSol) / 1e9;
-      miningOrb = Number(miner.rewardsOre) / 1e9;
+      miningOrb = Number(miner.rewardsToken) / LODE_MULTIPLIER;
     }
 
     // Fetch stake account
+    // In Lode: staking LODE tokens earns SOL rewards
     const stake = await fetchStake(wallet.publicKey);
     if (stake) {
-      stakingSol = Number(stake.rewardsSol) / 1e9;
-      stakingOrb = Number(stake.rewardsOre) / 1e9;
+      stakingSol = Number(stake.rewards) / 1e9;
+      stakingOrb = 0; // Staking in Lode only earns SOL, not tokens
     }
 
     return {

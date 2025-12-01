@@ -6,14 +6,13 @@ import { getConnection } from '../../src/utils/solana';
 import { recordTransaction } from '../../src/utils/database';
 import { sendNotification } from './notifications';
 import logger from '../../src/utils/logger';
+import { config, LODE_MULTIPLIER } from '../../src/utils/config';
 
 /**
- * ORB Auto-Transfer Utility
+ * LODE Auto-Transfer Utility
  *
- * Automatically transfers ORB tokens when balance reaches threshold
+ * Automatically transfers LODE tokens when balance reaches threshold
  */
-
-const ORB_MINT = new PublicKey('orebyr4mDiPDVgnfqvF5xiu5gKnh94Szuz8dqgNqdJn');
 
 export interface TransferResult {
   transferred: boolean;
@@ -46,9 +45,9 @@ export function validateRecipientAddress(address: string): { valid: boolean; err
 }
 
 /**
- * Get current ORB balance for a user
+ * Get current LODE balance for a user
  */
-async function getUserOrbBalance(telegramId: string): Promise<number> {
+async function getUserLodeBalance(telegramId: string): Promise<number> {
   try {
     const wallet = await getUserWallet(telegramId);
     if (!wallet) {
@@ -58,7 +57,7 @@ async function getUserOrbBalance(telegramId: string): Promise<number> {
     const connection = getConnection();
     const tokenAccounts = await connection.getTokenAccountsByOwner(
       wallet.publicKey,
-      { mint: ORB_MINT }
+      { mint: config.lodeTokenMint }
     );
 
     if (tokenAccounts.value.length === 0) {
@@ -68,15 +67,15 @@ async function getUserOrbBalance(telegramId: string): Promise<number> {
     const balance = await connection.getTokenAccountBalance(tokenAccounts.value[0].pubkey);
     return parseFloat(balance.value.uiAmount?.toString() || '0');
   } catch (error) {
-    logger.error(`[Auto-Transfer] Failed to get ORB balance for ${telegramId}:`, error);
+    logger.error(`[Auto-Transfer] Failed to get LODE balance for ${telegramId}:`, error);
     return 0;
   }
 }
 
 /**
- * Transfer ORB tokens to recipient address
+ * Transfer LODE tokens to recipient address
  */
-async function transferOrb(
+async function transferLode(
   telegramId: string,
   recipientAddress: string,
   amount: number
@@ -92,13 +91,13 @@ async function transferOrb(
 
     // Get source token account
     const sourceTokenAccount = await getAssociatedTokenAddress(
-      ORB_MINT,
+      config.lodeTokenMint,
       wallet.publicKey
     );
 
     // Get or create destination token account
     const destinationTokenAccount = await getAssociatedTokenAddress(
-      ORB_MINT,
+      config.lodeTokenMint,
       recipient
     );
 
@@ -109,14 +108,14 @@ async function transferOrb(
 
     // If destination account doesn't exist, we need to create it
     // Note: In production, you might want to use createAssociatedTokenAccountInstruction
-    // For simplicity, we'll assume the recipient has an ORB token account
+    // For simplicity, we'll assume the recipient has a LODE token account
 
     // Create transfer instruction
     const transferInstruction = createTransferInstruction(
       sourceTokenAccount,
       destinationTokenAccount,
       wallet.publicKey,
-      Math.floor(amount * 1e9), // Convert to lamports
+      Math.floor(amount * LODE_MULTIPLIER), // Convert to LODE base units (11 decimals)
       [],
       TOKEN_PROGRAM_ID
     );
@@ -135,7 +134,7 @@ async function transferOrb(
     // Confirm transaction
     await connection.confirmTransaction(signature, 'confirmed');
 
-    logger.info(`[Auto-Transfer] Transferred ${amount} ORB to ${recipientAddress} for ${telegramId}`);
+    logger.info(`[Auto-Transfer] Transferred ${amount} LODE to ${recipientAddress} for ${telegramId}`);
 
     return { success: true, signature };
   } catch (error: any) {
@@ -147,7 +146,7 @@ async function transferOrb(
 /**
  * Check if auto-transfer conditions are met and execute if needed
  */
-export async function checkAndExecuteOrbTransfer(telegramId: string): Promise<TransferResult> {
+export async function checkAndExecuteLodeTransfer(telegramId: string): Promise<TransferResult> {
   try {
     // Get user settings
     const settings = await getUserSettings(telegramId);
@@ -177,22 +176,22 @@ export async function checkAndExecuteOrbTransfer(telegramId: string): Promise<Tr
       };
     }
 
-    // Get current ORB balance
-    const currentBalance = await getUserOrbBalance(telegramId);
+    // Get current LODE balance
+    const currentBalance = await getUserLodeBalance(telegramId);
 
-    // Check if balance meets threshold
+    // Check if balance meets threshold (using orb_transfer_threshold for backwards compat)
     if (currentBalance < settings.orb_transfer_threshold) {
       return {
         transferred: false,
-        reason: `Balance (${currentBalance.toFixed(2)} ORB) below threshold (${settings.orb_transfer_threshold} ORB)`
+        reason: `Balance (${currentBalance.toFixed(2)} LODE) below threshold (${settings.orb_transfer_threshold} LODE)`
       };
     }
 
-    // Calculate amount to transfer (all ORB above 0 to clear the balance)
+    // Calculate amount to transfer (all LODE above 0 to clear the balance)
     const transferAmount = currentBalance;
 
     // Execute transfer
-    const transferResult = await transferOrb(
+    const transferResult = await transferLode(
       telegramId,
       settings.transfer_recipient_address,
       transferAmount
@@ -205,7 +204,7 @@ export async function checkAndExecuteOrbTransfer(telegramId: string): Promise<Tr
         telegramId,
         NotificationType.TRANSACTION_FAILED,
         '❌ Auto-Transfer Failed',
-        `Failed to transfer ${transferAmount.toFixed(2)} ORB\n\nError: ${transferResult.error}`
+        `Failed to transfer ${transferAmount.toFixed(2)} LODE\n\nError: ${transferResult.error}`
       );
 
       return {
@@ -217,11 +216,11 @@ export async function checkAndExecuteOrbTransfer(telegramId: string): Promise<Tr
     // Record transaction
     const wallet = await getUserWallet(telegramId);
     await recordTransaction({
-      type: 'swap', // Using swap as closest match for transfer
+      type: 'swap',
       signature: transferResult.signature!,
       orbAmount: transferAmount,
       status: 'success',
-      notes: `Auto-transfer ${transferAmount.toFixed(2)} ORB to ${settings.transfer_recipient_address} for user ${telegramId}`,
+      notes: `Auto-transfer ${transferAmount.toFixed(2)} LODE to ${settings.transfer_recipient_address} for user ${telegramId}`,
       walletAddress: wallet?.publicKey.toBase58(),
       telegramId,
     });
@@ -232,10 +231,10 @@ export async function checkAndExecuteOrbTransfer(telegramId: string): Promise<Tr
       telegramId,
       NotificationType.TRANSACTION_SUCCESS,
       '✅ Auto-Transfer Completed',
-      `Transferred ${transferAmount.toFixed(2)} ORB to:\n\`${settings.transfer_recipient_address}\`\n\nSignature: \`${transferResult.signature}\``
+      `Transferred ${transferAmount.toFixed(2)} LODE to:\n\`${settings.transfer_recipient_address}\`\n\nSignature: \`${transferResult.signature}\``
     );
 
-    logger.info(`[Auto-Transfer] Successfully transferred ${transferAmount} ORB for ${telegramId}`);
+    logger.info(`[Auto-Transfer] Successfully transferred ${transferAmount} LODE for ${telegramId}`);
 
     return {
       transferred: true,
@@ -251,12 +250,15 @@ export async function checkAndExecuteOrbTransfer(telegramId: string): Promise<Tr
   }
 }
 
+// Backwards compatibility alias
+export const checkAndExecuteOrbTransfer = checkAndExecuteLodeTransfer;
+
 /**
  * Manually trigger auto-transfer check (for testing or manual execution)
  */
 export async function manualTriggerTransfer(telegramId: string): Promise<TransferResult> {
   logger.info(`[Auto-Transfer] Manual trigger for ${telegramId}`);
-  return await checkAndExecuteOrbTransfer(telegramId);
+  return await checkAndExecuteLodeTransfer(telegramId);
 }
 
 /**
@@ -270,7 +272,7 @@ export async function getAutoTransferStatus(telegramId: string): Promise<{
   willTransfer: boolean;
 }> {
   const settings = await getUserSettings(telegramId);
-  const currentBalance = await getUserOrbBalance(telegramId);
+  const currentBalance = await getUserLodeBalance(telegramId);
 
   const willTransfer = !!(
     settings.auto_transfer_enabled &&

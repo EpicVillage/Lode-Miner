@@ -6,9 +6,12 @@ export function formatSOL(amount: number): string {
   return `${amount.toFixed(4)} SOL`;
 }
 
-export function formatORB(amount: number): string {
-  return `${amount.toFixed(2)} ORB`;
+export function formatLODE(amount: number): string {
+  return `${amount.toFixed(2)} LODE`;
 }
+
+// Alias for backwards compatibility
+export const formatORB = formatLODE;
 
 export function formatUSD(amount: number): string {
   return `$${amount.toFixed(2)}`;
@@ -54,7 +57,7 @@ export function formatTransactionType(type: string): string {
   const typeEmojis: Record<string, string> = {
     deploy: '🔵 Deploy',
     claim_sol: '💰 Claim SOL',
-    claim_orb: '🔮 Claim ORB',
+    claim_lode: '🔮 Claim LODE',
     swap: '🔄 Swap',
     stake: '📊 Stake',
     automation_setup: '🤖 Auto Setup',

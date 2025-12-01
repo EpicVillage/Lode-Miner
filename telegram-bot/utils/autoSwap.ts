@@ -4,14 +4,14 @@ import { getUserSettings } from './userSettings';
 import { getUserBalances } from './userWallet';
 import { swapUserOrbToSol } from './userOperations';
 import { getOrbPrice } from '../../src/utils/jupiter';
-import { formatSOL, formatORB } from './formatters';
+import { formatSOL, formatLODE } from './formatters';
 import { Telegraf } from 'telegraf';
 
 /**
  * Auto-Swap Background Service
  *
  * Periodically checks all users with auto-swap enabled and automatically
- * swaps ORB to SOL when thresholds are met.
+ * swaps LODE to SOL when thresholds are met.
  */
 
 const AUTO_SWAP_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
@@ -58,22 +58,22 @@ async function processUserAutoSwap(telegramId: string): Promise<void> {
       return;
     }
 
-    // Check if ORB balance exceeds swap threshold
+    // Check if LODE balance exceeds swap threshold
     if (balances.orb < settings.swap_threshold) {
-      logger.debug(`[Auto-Swap] ${telegramId}: ORB ${balances.orb.toFixed(2)} below threshold ${settings.swap_threshold}`);
+      logger.debug(`[Auto-Swap] ${telegramId}: LODE ${balances.orb.toFixed(2)} below threshold ${settings.swap_threshold}`);
       return;
     }
 
     // Check price protection (min_orb_price)
     if (settings.min_orb_price > 0) {
       try {
-        const orbPrice = await getOrbPrice();
-        if (orbPrice.priceInUsd < settings.min_orb_price) {
-          logger.info(`[Auto-Swap] ${telegramId}: ORB price $${orbPrice.priceInUsd.toFixed(2)} below minimum $${settings.min_orb_price} - skipping swap`);
+        const lodePrice = await getOrbPrice();
+        if (lodePrice.priceInUsd < settings.min_orb_price) {
+          logger.info(`[Auto-Swap] ${telegramId}: LODE price $${lodePrice.priceInUsd.toFixed(2)} below minimum $${settings.min_orb_price} - skipping swap`);
           return;
         }
       } catch (error) {
-        logger.warn(`[Auto-Swap] ${telegramId}: Failed to check ORB price:`, error);
+        logger.warn(`[Auto-Swap] ${telegramId}: Failed to check LODE price:`, error);
         // Continue with swap if price check fails (safer to proceed)
       }
     }
@@ -86,13 +86,13 @@ async function processUserAutoSwap(telegramId: string): Promise<void> {
       return;
     }
 
-    logger.info(`[Auto-Swap] ${telegramId}: Swapping ${swapAmount.toFixed(2)} ORB (balance: ${balances.orb.toFixed(2)}, keeping: ${settings.min_orb_to_keep})`);
+    logger.info(`[Auto-Swap] ${telegramId}: Swapping ${swapAmount.toFixed(2)} LODE (balance: ${balances.orb.toFixed(2)}, keeping: ${settings.min_orb_to_keep})`);
 
     // Execute swap
     const result = await swapUserOrbToSol(telegramId, swapAmount);
 
     if (result.success && result.solReceived) {
-      const message = `✅ *Auto-Swap Successful*\n\nSwapped: ${formatORB(swapAmount)} ORB\nReceived: ${formatSOL(result.solReceived)} SOL\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
+      const message = `✅ *Auto-Swap Successful*\n\nSwapped: ${formatLODE(swapAmount)} LODE\nReceived: ${formatSOL(result.solReceived)} SOL\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
 
       // Send notification
       if (bot) {
@@ -103,14 +103,14 @@ async function processUserAutoSwap(telegramId: string): Promise<void> {
         }
       }
 
-      logger.info(`[Auto-Swap] ${telegramId}: Swapped ${swapAmount.toFixed(2)} ORB → ${result.solReceived.toFixed(4)} SOL | ${result.signature}`);
+      logger.info(`[Auto-Swap] ${telegramId}: Swapped ${swapAmount.toFixed(2)} LODE → ${result.solReceived.toFixed(4)} SOL | ${result.signature}`);
     } else {
       logger.warn(`[Auto-Swap] ${telegramId}: Swap failed - ${result.error}`);
 
       // Send error notification
       if (bot) {
         try {
-          const errorMessage = `⚠️ *Auto-Swap Failed*\n\nFailed to swap ${formatORB(swapAmount)} ORB\n\nError: ${result.error}\n\nPlease check your settings or try manual swap.`;
+          const errorMessage = `⚠️ *Auto-Swap Failed*\n\nFailed to swap ${formatLODE(swapAmount)} LODE\n\nError: ${result.error}\n\nPlease check your settings or try manual swap.`;
           await bot.telegram.sendMessage(telegramId, errorMessage, { parse_mode: 'Markdown' });
         } catch (error) {
           logger.warn(`[Auto-Swap] Failed to send error notification to ${telegramId}:`, error);

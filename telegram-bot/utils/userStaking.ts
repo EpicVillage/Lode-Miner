@@ -3,10 +3,11 @@ import logger from '../../src/utils/logger';
 import { getUserWallet } from './userWallet';
 import { getConnection } from '../../src/utils/solana';
 import { fetchStake } from '../../src/utils/accounts';
-import { formatORB, formatSOL } from './formatters';
+import { formatLODE, formatSOL } from './formatters';
 import { PublicKey, Transaction } from '@solana/web3.js';
-import { buildStakeInstruction, buildClaimYieldInstruction, sendAndConfirmTransaction } from '../../src/utils/program';
+import { buildStakeDepositInstruction, buildStakeClaimInstruction, sendAndConfirmTransaction } from '../../src/utils/program';
 import { getUserBalances } from './userWallet';
+import { LODE_MULTIPLIER } from '../../src/utils/config';
 
 /**
  * User-specific staking operations for telegram bot users
@@ -35,8 +36,9 @@ export async function getUserStakingInfo(telegramId: string): Promise<UserStakin
       return null;
     }
 
-    const stakedAmount = Number(stake.balance) / 1e9;
-    const accruedRewards = Number(stake.rewardsOre) / 1e9;
+    const stakedAmount = Number(stake.balance) / LODE_MULTIPLIER;
+    // In Lode: staking LODE tokens earns SOL rewards (stored in 'rewards')
+    const accruedRewards = Number(stake.rewards) / 1e9;
 
     // Update database record
     await updateUserStakingInfo(telegramId, stakedAmount, accruedRewards);
@@ -95,19 +97,19 @@ export async function stakeUserOrb(
       return { success: false, error: 'Stake amount must be greater than 0' };
     }
 
-    // Check ORB balance
+    // Check LODE balance
     const balances = await getUserBalances(telegramId);
     if (!balances || balances.orb < amount) {
       return {
         success: false,
-        error: `Insufficient ORB balance. Need ${amount} ORB, have ${balances?.orb.toFixed(2) || 0} ORB`
+        error: `Insufficient LODE balance. Need ${amount} LODE, have ${balances?.orb.toFixed(2) || 0} LODE`
       };
     }
 
-    logger.info(`[User Staking] Staking ${amount} ORB for ${telegramId}`);
+    logger.info(`[User Staking] Staking ${amount} LODE for ${telegramId}`);
 
     // Build and send stake instruction
-    const instruction = buildStakeInstruction(amount, wallet.publicKey);
+    const instruction = await buildStakeDepositInstruction(amount, wallet.publicKey);
     const { signature } = await sendAndConfirmTransaction([instruction], 'Stake', { wallet });
 
     // Update database with new staked amount
@@ -121,16 +123,16 @@ export async function stakeUserOrb(
       signature,
       orbAmount: amount,
       status: 'success',
-      notes: `Staked ${amount} ORB for user ${telegramId}`,
+      notes: `Staked ${amount} LODE for user ${telegramId}`,
       walletAddress: wallet.publicKey.toBase58(),
       telegramId,
     });
 
-    logger.info(`[User Staking] Successfully staked ${amount} ORB | ${signature}`);
+    logger.info(`[User Staking] Successfully staked ${amount} LODE | ${signature}`);
 
     return { success: true, signature };
   } catch (error: any) {
-    logger.error('[User Staking] Failed to stake ORB:', error);
+    logger.error('[User Staking] Failed to stake LODE:', error);
     return { success: false, error: error.message };
   }
 }
@@ -154,10 +156,10 @@ export async function claimUserStakingRewards(
 
     const claimedAmount = stakingInfo.accrued_rewards;
 
-    logger.info(`[User Staking] Claiming ${claimedAmount} ORB staking rewards for ${telegramId}`);
+    logger.info(`[User Staking] Claiming ${claimedAmount} SOL staking rewards for ${telegramId}`);
 
-    // Build and send claim yield instruction
-    const instruction = await buildClaimYieldInstruction(claimedAmount, wallet.publicKey);
+    // Build and send claim yield instruction (In Lode: staking earns SOL rewards)
+    const instruction = buildStakeClaimInstruction(wallet.publicKey);
     const { signature } = await sendAndConfirmTransaction([instruction], 'Claim Staking Rewards', { wallet });
 
     // Update staking info (reset rewards)
@@ -165,16 +167,16 @@ export async function claimUserStakingRewards(
 
     // Record transaction
     await recordTransaction({
-      type: 'claim_orb',
+      type: 'claim_sol',
       signature,
-      orbAmount: claimedAmount,
+      solAmount: claimedAmount,
       status: 'success',
-      notes: `Claimed ${claimedAmount} ORB staking rewards for user ${telegramId}`,
+      notes: `Claimed ${claimedAmount} SOL staking rewards for user ${telegramId}`,
       walletAddress: wallet.publicKey.toBase58(),
       telegramId,
     });
 
-    logger.info(`[User Staking] Successfully claimed ${claimedAmount} ORB staking rewards | ${signature}`);
+    logger.info(`[User Staking] Successfully claimed ${claimedAmount} SOL staking rewards | ${signature}`);
 
     return { success: true, amount: claimedAmount, signature };
   } catch (error: any) {
@@ -220,7 +222,7 @@ export function formatStakingDisplay(
     return `
 🏦 *Staking Status*
 
-You have no ORB staked.
+You have no LODE staked.
 
 Use /stake to start earning rewards!
 `.trim();
@@ -232,12 +234,12 @@ Use /stake to start earning rewards!
 🏦 *Staking Status*
 
 *Your Stake:*
-• Staked Amount: ${formatORB(stakingInfo.staked_amount)}
-• Accrued Rewards: ${formatORB(stakingInfo.accrued_rewards)}
+• Staked Amount: ${formatLODE(stakingInfo.staked_amount)}
+• Accrued Rewards: ${formatLODE(stakingInfo.accrued_rewards)}
 • Last Updated: ${lastUpdated}
 
 ${poolInfo ? `*Pool Info:*
-• Total Staked: ${formatORB(poolInfo.totalStaked)}
+• Total Staked: ${formatLODE(poolInfo.totalStaked)}
 • Reward Rate: ${poolInfo.rewardRate}% APY` : ''}
 
 ${stakingInfo.accrued_rewards > 0 ? '✨ You have rewards to claim!' : ''}

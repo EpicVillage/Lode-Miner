@@ -1,7 +1,7 @@
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import bs58 from 'bs58';
-import { config } from './config';
+import { config, LODE_MULTIPLIER } from './config';
 import { getConnection } from './solana';
 import logger from './logger';
 
@@ -35,20 +35,20 @@ export async function getOrbBalance(publicKey?: PublicKey): Promise<number> {
   const address = publicKey || getWallet().publicKey;
 
   try {
-    // Get the associated token account for ORB
+    // Get the associated token account for LODE
     const ata = await getAssociatedTokenAddress(
-      config.orbTokenMint,
+      config.lodeTokenMint,
       address
     );
 
     // Get the token account info
     const accountInfo = await getAccount(connection, ata);
 
-    // ORB typically has 9 decimals (like SOL)
-    return Number(accountInfo.amount) / 1e9;
+    // LODE has 11 decimals
+    return Number(accountInfo.amount) / LODE_MULTIPLIER;
   } catch (error) {
     // If the account doesn't exist, balance is 0
-    logger.debug(`ORB token account not found for ${address.toBase58()}, balance is 0`);
+    logger.debug(`LODE token account not found for ${address.toBase58()}, balance is 0`);
     return 0;
   }
 }

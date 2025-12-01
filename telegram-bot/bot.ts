@@ -6,7 +6,7 @@ import logger from '../src/utils/logger';
 import { initializeDatabase, getQuery, allQuery } from '../src/utils/database';
 import {
   formatSOL,
-  formatORB,
+  formatLODE,
   formatUSD,
 } from './utils/formatters';
 import {
@@ -85,7 +85,7 @@ import {
 import {
   validateRecipientAddress,
   getAutoTransferStatus
-} from './utils/orbAutoTransfer';
+} from './utils/lodeAutoTransfer';
 import {
   initializeAutoClaim,
   stopAutoClaim,
@@ -117,7 +117,7 @@ interface BotContext extends Context {
 }
 
 /**
- * Telegram Bot for ORB Mining
+ * Telegram Bot for LODE Mining
  * Multi-user bot - each user manages their own wallet
  */
 interface SessionData {
@@ -273,12 +273,12 @@ class OrbMiningBot {
           }
 
           session.awaitingSwapAmount = false;
-          await ctx.reply(`⏳ Swapping ${formatORB(amount)} to SOL...`);
+          await ctx.reply(`⏳ Swapping ${formatLODE(amount)} to SOL...`);
 
           const result = await swapUserOrbToSol(telegramId, amount);
 
           if (result.success) {
-            const message = `✅ *Swap Successful!*\n\nSwapped: ${formatORB(result.orbSwapped!)}\nReceived: ${formatSOL(result.solReceived!)}\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
+            const message = `✅ *Swap Successful!*\n\nSwapped: ${formatLODE(result.orbSwapped!)}\nReceived: ${formatSOL(result.solReceived!)}\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
             await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
           } else {
             await ctx.reply(`❌ Swap failed: ${result.error}`);
@@ -551,7 +551,7 @@ class OrbMiningBot {
     this.bot.command('help', async (ctx) => {
       try {
         await ctx.reply(
-          `📖 <b>ORB Mining Bot Help</b>
+          `📖 <b>LODE Mining Bot Help</b>
 
 <b>💼 Wallet & Status:</b>
 /start - Show main menu
@@ -561,9 +561,9 @@ class OrbMiningBot {
 
 <b>💰 Manual Operations:</b>
 /claim_sol - Claim SOL rewards
-/claim_orb - Claim ORB rewards
+/claim_lode - Claim LODE rewards
 /claim_staking - Claim staking rewards
-/swap - Swap ORB to SOL
+/swap - Swap LODE to SOL
 /deploy - Deploy to current round
 
 <b>⚙️ Automation & Control:</b>
@@ -654,7 +654,7 @@ class OrbMiningBot {
       await this.handleClaimSol(ctx);
     });
 
-    this.bot.command('claim_orb', async (ctx) => {
+    this.bot.command('claim_lode', async (ctx) => {
       await this.handleClaimOrb(ctx);
     });
 
@@ -784,7 +784,7 @@ Once you've saved it, click the button below to continue.`,
 
     // Confirm key saved - show main menu
     this.bot.action('confirm_key_saved', async (ctx) => {
-      await ctx.answerCbQuery('Welcome to ORB Mining!');
+      await ctx.answerCbQuery('Welcome to LODE Mining!');
       await this.handleStart(ctx);
     });
 
@@ -935,7 +935,7 @@ This action cannot be undone.`;
       setTimeout(() => this.handleStatus(ctx, true), 2000);
     });
 
-    this.bot.action('claim_orb_quick', async (ctx) => {
+    this.bot.action('claim_lode_quick', async (ctx) => {
       await ctx.answerCbQuery();
       await this.handleClaimOrb(ctx);
       // Refresh status after claim
@@ -1231,7 +1231,7 @@ This action cannot be undone.`;
       session.awaitingTransferRecipient = true;
 
       const message = await ctx.reply(
-        `📤 *Set Transfer Recipient*\n\nPlease send the Solana wallet address where you want to transfer your ORB tokens.\n\nThe address will be validated before saving.\n\nUse /cancel to abort.`,
+        `📤 *Set Transfer Recipient*\n\nPlease send the Solana wallet address where you want to transfer your LODE tokens.\n\nThe address will be validated before saving.\n\nUse /cancel to abort.`,
         { parse_mode: 'Markdown' }
       );
 
@@ -1317,7 +1317,7 @@ This action cannot be undone.`;
 
     // Show main menu
     const user = await getUser(telegramId);
-    const message = `👋 Welcome back to ORB Mining Bot!
+    const message = `👋 Welcome back to LODE Mining Bot!
 
 *Your Wallet:* \`${user!.public_key.slice(0, 8)}...${user!.public_key.slice(-8)}\`
 
@@ -1383,9 +1383,9 @@ Use the buttons below or type a command to get started.`;
     };
 
     await ctx.reply(
-      `👋 *Welcome to ORB Mining Bot!*
+      `👋 *Welcome to LODE Mining Bot!*
 
-This bot helps you mine ore.blue tokens.
+This bot helps you mine LODE tokens.
 
 To get started, choose an option below:
 
@@ -1466,7 +1466,7 @@ Use the buttons below to manage your wallet.`;
 
     try {
       const balances = await getUserBalances(telegramId);
-      const { priceInUsd: orbPriceUsd } = await getOrbPrice();
+      const { priceInUsd: lodePriceUsd } = await getOrbPrice();
       const rewards = await getUserClaimableRewards(telegramId);
       await updateLastActive(telegramId);
 
@@ -1476,27 +1476,27 @@ Use the buttons below to manage your wallet.`;
 
 *Current Balance:*
 💎 ${formatSOL(balances.sol)}
-🔮 ${formatORB(balances.orb)}
+🔮 ${formatLODE(balances.orb)}
 
 *Claimable Rewards:*
 ${rewards.miningSol > 0 ? `⛏️ Mining SOL: ${formatSOL(rewards.miningSol)}` : ''}
-${rewards.miningOrb > 0 ? `⛏️ Mining ORB: ${formatORB(rewards.miningOrb)}` : ''}
+${rewards.miningOrb > 0 ? `⛏️ Mining LODE: ${formatLODE(rewards.miningOrb)}` : ''}
 ${rewards.stakingSol > 0 ? `📊 Staking SOL: ${formatSOL(rewards.stakingSol)}` : ''}
-${rewards.stakingOrb > 0 ? `📊 Staking ORB: ${formatORB(rewards.stakingOrb)}` : ''}
+${rewards.stakingOrb > 0 ? `📊 Staking LODE: ${formatLODE(rewards.stakingOrb)}` : ''}
 ${!hasClaimableRewards ? '✅ No pending rewards' : ''}
 ─────────────────────────
-*ORB Price:*
-💵 ${formatUSD(orbPriceUsd)}
+*LODE Price:*
+💵 ${formatUSD(lodePriceUsd)}
 
 *Portfolio Value:*
-💰 ${formatUSD(balances.sol * 150 + balances.orb * orbPriceUsd)}
+💰 ${formatUSD(balances.sol * 150 + balances.orb * lodePriceUsd)}
 
 Updated: ${new Date().toLocaleTimeString()}`;
 
       const keyboard = {
         inline_keyboard: [
           ...(rewards.miningSol > 0 ? [[{ text: '💰 Claim SOL', callback_data: 'claim_sol_quick' }]] : []),
-          ...(rewards.miningOrb > 0 ? [[{ text: '🔮 Claim ORB', callback_data: 'claim_orb_quick' }]] : []),
+          ...(rewards.miningOrb > 0 ? [[{ text: '🔮 Claim LODE', callback_data: 'claim_lode_quick' }]] : []),
           [
             { text: '🔄 Swap', callback_data: 'swap' },
             { text: '🚀 Deploy', callback_data: 'deploy' }
@@ -1588,7 +1588,7 @@ The automation will continue running until the balance is depleted.`;
 *Cost per Round:* ${formatSOL(solPerRound)}
 *Estimated Rounds:* ${estimatedRounds}
 
-Start automation to let the bot mine ORB for you automatically.`;
+Start automation to let the bot mine LODE for you automatically.`;
 
         keyboard = {
           inline_keyboard: [
@@ -1648,7 +1648,7 @@ Start automation to let the bot mine ORB for you automatically.`;
 *Target Rounds:* ${result.targetRounds}
 *Transaction:* \`${result.signature}\`
 
-Your automation is now active and will mine ORB for you automatically.`;
+Your automation is now active and will mine LODE for you automatically.`;
 
         await ctx.editMessageText(message, { parse_mode: 'Markdown' });
 
@@ -1744,17 +1744,17 @@ Active Since: ${new Date(user!.created_at).toLocaleDateString()}
 
 *Current Holdings:*
 💎 ${formatSOL(balances.sol)}
-🔮 ${formatORB(balances.orb)}
+🔮 ${formatLODE(balances.orb)}
 
 *Mining Stats:*
 • Total Deployments: ${miningStats.totalMines}
 • Successful: ${miningStats.successfulMines}
-• Total ORB Earned: ${formatORB(miningStats.totalOrbMined)}
-• Avg per Deployment: ${formatORB(miningStats.avgOrbPerMine)}
+• Total LODE Earned: ${formatLODE(miningStats.totalOrbMined)}
+• Avg per Deployment: ${formatLODE(miningStats.avgOrbPerMine)}
 
 *Total Claims:*
 • SOL Claimed: ${formatSOL(claimStats.totalSolClaimed)}
-• ORB Claimed: ${formatORB(claimStats.totalOrbClaimed)}
+• LODE Claimed: ${formatLODE(claimStats.totalOrbClaimed)}
 • Total Claims: ${claimStats.totalClaims}
 
 Generated: ${new Date().toLocaleString()}`;
@@ -1847,7 +1847,7 @@ _Updated: ${new Date().toLocaleString()}_`;
       const message = `💰 *Wallet Balance*
 
 💎 ${formatSOL(balances.solBalance)}
-🔮 ${formatORB(balances.orbBalance)}
+🔮 ${formatLODE(balances.orbBalance)}
 
 Auto-claim features are coming soon for multi-user support.`;
 
@@ -2033,7 +2033,7 @@ Auto-claim features are coming soon for multi-user support.`;
       }
 
       const user = await getUser(telegramId);
-      const orbPrice = await getOrbPrice();
+      const lodePrice = await getOrbPrice();
 
       const pnl = await calculateUserPnL(
         telegramId,
@@ -2043,7 +2043,7 @@ Auto-claim features are coming soon for multi-user support.`;
         0, // automationSol - not available from getUserBalances
         0, // claimableSol - not available from getUserBalances
         0, // claimableOrb - not available from getUserBalances
-        orbPrice.priceInUsd
+        lodePrice.priceInUsd
       );
 
       const message = formatPnLDisplay(pnl);
@@ -2091,7 +2091,7 @@ Auto-claim features are coming soon for multi-user support.`;
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: '➕ Stake ORB', callback_data: 'stake_orb' }],
+          [{ text: '➕ Stake LODE', callback_data: 'stake_orb' }],
           stakingInfo && stakingInfo.accrued_rewards > 0
             ? [{ text: '💰 Claim Rewards', callback_data: 'claim_staking_rewards' }]
             : [],
@@ -2219,7 +2219,7 @@ Auto-claim features are coming soon for multi-user support.`;
   }
 
   /**
-   * Handle /claim_orb command - claim ORB rewards
+   * Handle /claim_lode command - claim LODE rewards
    */
   private async handleClaimOrb(ctx: BotContext) {
     const telegramId = ctx.from!.id.toString();
@@ -2232,20 +2232,20 @@ Auto-claim features are coming soon for multi-user support.`;
     try {
       await updateLastActive(telegramId);
 
-      await ctx.reply('⏳ Claiming ORB rewards...');
+      await ctx.reply('⏳ Claiming LODE rewards...');
 
       const result = await claimUserOrb(telegramId);
 
       if (result.success) {
-        const message = `✅ *ORB Claimed Successfully!*\n\nAmount: ${formatORB(result.orbAmount!)}\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
+        const message = `✅ *LODE Claimed Successfully!*\n\nAmount: ${formatLODE(result.orbAmount!)}\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
         await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
       } else {
-        await ctx.reply(`❌ Failed to claim ORB: ${result.error}`);
-        await notifyTransactionFailed(telegramId, 'Claim ORB', result.error!);
+        await ctx.reply(`❌ Failed to claim LODE: ${result.error}`);
+        await notifyTransactionFailed(telegramId, 'Claim LODE', result.error!);
       }
     } catch (error) {
       logger.error('[Telegram] Error in handleClaimOrb:', error);
-      await ctx.reply('Failed to claim ORB. Please try again.');
+      await ctx.reply('Failed to claim LODE. Please try again.');
     }
   }
 
@@ -2268,7 +2268,7 @@ Auto-claim features are coming soon for multi-user support.`;
       const result = await claimUserStakingRewards(telegramId);
 
       if (result.success) {
-        const message = `✅ *Staking Rewards Claimed!*\n\nSOL: ${formatSOL(result.solAmount || 0)}\nORB: ${formatORB(result.orbAmount || 0)}\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
+        const message = `✅ *Staking Rewards Claimed!*\n\nSOL: ${formatSOL(result.solAmount || 0)}\nLODE: ${formatLODE(result.orbAmount || 0)}\n\n[View on Solscan](https://solscan.io/tx/${result.signature})`;
         await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
       } else {
         await ctx.reply(`❌ Failed to claim staking rewards: ${result.error}`);
@@ -2281,7 +2281,7 @@ Auto-claim features are coming soon for multi-user support.`;
   }
 
   /**
-   * Handle /swap command - swap ORB to SOL
+   * Handle /swap command - swap LODE to SOL
    */
   private async handleSwap(ctx: BotContext) {
     const telegramId = ctx.from!.id.toString();
@@ -2300,20 +2300,20 @@ Auto-claim features are coming soon for multi-user support.`;
 
       const balances = await getUserBalances(telegramId);
 
-      // Get quote for 10 ORB to show current rate
+      // Get quote for 10 LODE to show current rate
       let rateInfo = '';
       try {
-        const quote = await getSwapQuote(10, 300); // 10 ORB with 3% slippage
+        const quote = await getSwapQuote(10, 300); // 10 LODE with 3% slippage
         if (quote) {
           const solAmount = Number(quote.outAmount) / 1e9;
-          rateInfo = `\n💡 Current rate: 10 ORB ≈ ${formatSOL(solAmount)}`;
+          rateInfo = `\n💡 Current rate: 10 LODE ≈ ${formatSOL(solAmount)}`;
         }
       } catch (error) {
         logger.debug('[Swap] Failed to get quote for rate display:', error);
         // Continue without rate info if quote fails
       }
 
-      const message = `💱 *Swap ORB to SOL*\n\nYour ORB Balance: ${formatORB(balances?.orb || 0)}${rateInfo}\n\nHow much ORB would you like to swap?\n\nSend the amount (e.g., "10" for 10 ORB)\n\nOr use /cancel to abort.`;
+      const message = `💱 *Swap LODE to SOL*\n\nYour LODE Balance: ${formatLODE(balances?.orb || 0)}${rateInfo}\n\nHow much LODE would you like to swap?\n\nSend the amount (e.g., "10" for 10 LODE)\n\nOr use /cancel to abort.`;
 
       await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (error) {
@@ -2525,7 +2525,7 @@ Active Since: ${new Date(user!.created_at).toLocaleDateString()}
 
 *Current Balances:*
 SOL: ${formatSOL(balances?.sol || 0)}
-ORB: ${formatORB(balances?.orb || 0)}
+LODE: ${formatLODE(balances?.orb || 0)}
 
 *Performance:*
 Total Transactions: ${stats.totalTransactions}
@@ -2539,7 +2539,7 @@ Win Rate: ${rounds.winRate.toFixed(1)}%
 
 *Rewards:*
 SOL Earned: ${formatSOL(rounds.totalRewardsSol)}
-ORB Earned: ${formatORB(rounds.totalRewardsOrb)}
+LODE Earned: ${formatLODE(rounds.totalRewardsOrb)}
 
 🚧 *Export Feature Coming Soon!*
 Advanced analytics and chart export will be available in a future update.
@@ -2572,7 +2572,7 @@ Advanced analytics and chart export will be available in a future update.
       session.awaitingTransferRecipient = true;
 
       const message = await ctx.reply(
-        `📤 *Set Transfer Recipient*\n\nPlease send the Solana wallet address where you want to transfer your ORB tokens.\n\nThe address will be validated before saving.\n\nUse /cancel to abort.`,
+        `📤 *Set Transfer Recipient*\n\nPlease send the Solana wallet address where you want to transfer your LODE tokens.\n\nThe address will be validated before saving.\n\nUse /cancel to abort.`,
         { parse_mode: 'Markdown' }
       );
 
@@ -2616,18 +2616,18 @@ Advanced analytics and chart export will be available in a future update.
 
 *Configuration:*
 • Status: ${status.enabled ? '✅ Enabled' : '❌ Disabled'}
-• Transfer Threshold: ${formatORB(status.threshold)}
+• Transfer Threshold: ${formatLODE(status.threshold)}
 • Recipient: ${recipientDisplay}
 
 *Current Balance:*
-• ORB Balance: ${formatORB(status.currentBalance)}
+• LODE Balance: ${formatLODE(status.currentBalance)}
 • Will Transfer: ${status.willTransfer ? '✅ Yes (conditions met)' : '❌ No'}
 
 ${!status.recipientAddress ? '\n⚠️ *Please set a recipient address first using /set_transfer_recipient*' : ''}
 
 ${!status.enabled && status.recipientAddress ? '\n💡 *Enable auto-transfer in /settings to activate*' : ''}
 
-Transfers happen automatically when your ORB balance reaches the threshold.
+Transfers happen automatically when your LODE balance reaches the threshold.
 `.trim();
 
       await ctx.reply(statusMessage, { parse_mode: 'Markdown' });

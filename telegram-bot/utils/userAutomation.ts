@@ -1,14 +1,15 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { getConnection } from '../../src/utils/solana';
-import { getAutomationPDA, getMinerPDA, fetchBoard, fetchTreasury } from '../../src/utils/accounts';
-import { sendAndConfirmTransaction, buildAutomateInstruction, AutomationStrategy } from '../../src/utils/program';
-import { TransactionInstruction, SystemProgram } from '@solana/web3.js';
+import { getAutomationPDA, getMinerPDA, fetchBoard, fetchTreasury, isReferralInitialized } from '../../src/utils/accounts';
+import { sendAndConfirmTransaction, buildAutomateInstruction, buildRegisterReferralInstruction, buildCancelAutomateInstruction, AutomationStrategy } from '../../src/utils/program';
+import { TransactionInstruction, SystemProgram, Transaction } from '@solana/web3.js';
 import { getOrbPrice } from '../../src/utils/jupiter';
 import { recordTransaction } from '../../src/utils/database';
 import logger from '../../src/utils/logger';
+import { config, LODE_MULTIPLIER } from '../../src/utils/config';
 
-// BORE protocol program ID (Ore Blue mining)
-const ORB_PROGRAM_ID = new PublicKey('boreXQWsKpsJz5RR9BMtN8Vk4ndAk23sutj8spWYhwk');
+// Default referrer address (dev wallet for referral rewards)
+const DEFAULT_REFERRER = new PublicKey('9LGAtUrQx8u3YXF5traoUtFBN3w62bgqohLc1Npkh3Yq');
 
 /**
  * User-specific automation utilities for Telegram bot
@@ -50,31 +51,7 @@ function calculateTargetRounds(maxBudget: number, solPerRound: number): number {
   return Math.min(maxRounds, 1000);
 }
 
-/**
- * Build instruction to close automation account for a user
- */
-async function buildCloseAutomationInstruction(userWallet: Keypair): Promise<TransactionInstruction> {
-  const [minerPDA] = getMinerPDA(userWallet.publicKey);
-  const [automationPDA] = getAutomationPDA(userWallet.publicKey);
-
-  const AUTOMATE_DISCRIMINATOR = 0x00;
-  const data = Buffer.alloc(34);
-  data.writeUInt8(AUTOMATE_DISCRIMINATOR, 0);
-
-  const keys = [
-    { pubkey: userWallet.publicKey, isSigner: true, isWritable: true },
-    { pubkey: automationPDA, isSigner: false, isWritable: true },
-    { pubkey: PublicKey.default, isSigner: false, isWritable: true },
-    { pubkey: minerPDA, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ];
-
-  return new TransactionInstruction({
-    keys,
-    programId: ORB_PROGRAM_ID,
-    data,
-  });
-}
+// Note: buildCancelAutomateInstruction is imported from program.ts
 
 /**
  * Close automation account for a specific user
@@ -99,7 +76,7 @@ export async function closeUserAutomation(userWallet: Keypair, telegramId: strin
     const returnedSol = automationInfo.balance / 1e9;
     logger.info(`[User Automation] Will return ${returnedSol.toFixed(4)} SOL to user`);
 
-    const closeInstruction = await buildCloseAutomationInstruction(userWallet);
+    const closeInstruction = buildCancelAutomateInstruction(userWallet.publicKey);
 
     // Build transaction with user's wallet as signer
     const { Transaction, sendAndConfirmTransaction: sendTx } = await import('@solana/web3.js');
@@ -171,6 +148,33 @@ export async function createUserAutomation(userWallet: Keypair, telegramId: stri
       };
     }
 
+    // Check if referral is initialized (required for Lode protocol)
+    const hasReferral = await isReferralInitialized(userWallet.publicKey);
+    if (!hasReferral) {
+      logger.info(`[User Automation] User ${telegramId} needs referral registration...`);
+
+      try {
+        const connection = getConnection();
+        const registerInstruction = buildRegisterReferralInstruction(DEFAULT_REFERRER, userWallet.publicKey);
+
+        const { Transaction: TxClass } = await import('@solana/web3.js');
+        const registerTx = new TxClass().add(registerInstruction);
+        registerTx.feePayer = userWallet.publicKey;
+        registerTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+        const registerSig = await connection.sendTransaction(registerTx, [userWallet]);
+        await connection.confirmTransaction(registerSig);
+
+        logger.info(`[User Automation] Referral registered: ${registerSig}`);
+      } catch (refError) {
+        logger.error('[User Automation] Failed to register referral:', refError);
+        return {
+          success: false,
+          error: 'Failed to register referral - required for automation',
+        };
+      }
+    }
+
     // Get wallet balance
     const connection = getConnection();
     const balance = await connection.getBalance(userWallet.publicKey);
@@ -202,7 +206,7 @@ export async function createUserAutomation(userWallet: Keypair, telegramId: stri
     let motherloadOrb = 0;
     try {
       const treasury = await fetchTreasury();
-      motherloadOrb = Number(treasury.motherlode) / 1e9;
+      motherloadOrb = Number(treasury.motherlodeBl) / LODE_MULTIPLIER;
     } catch (error) {
       logger.debug('[User Automation] Could not fetch treasury for logging, continuing anyway');
     }
@@ -242,7 +246,7 @@ export async function createUserAutomation(userWallet: Keypair, telegramId: stri
         signature,
         solAmount: deposit,
         status: 'success',
-        notes: `User ${telegramId} setup: ${targetRounds} rounds @ ${solPerRound.toFixed(4)} SOL/round (motherload: ${motherloadOrb.toFixed(2)} ORB)`,
+        notes: `User ${telegramId} setup: ${targetRounds} rounds @ ${solPerRound.toFixed(4)} SOL/round (motherload: ${motherloadOrb.toFixed(2)} LODE)`,
         orbPriceUsd,
         txFeeSol: 0.005,
         walletAddress: userWallet.publicKey.toBase58(),

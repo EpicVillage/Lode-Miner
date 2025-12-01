@@ -35,11 +35,11 @@ export interface TruePnL {
     claimableSol: number;
     totalSol: number;
 
-    walletOrb: number;
-    claimableOrb: number;
-    stakedOrb: number;
-    totalOrb: number;
-    orbValueSol: number; // ORB holdings × price
+    walletOrb: number; // Variable name kept for compatibility
+    claimableOrb: number; // Variable name kept for compatibility
+    stakedOrb: number; // Variable name kept for compatibility
+    totalOrb: number; // Variable name kept for compatibility
+    orbValueSol: number; // LODE holdings × price (variable name kept for compatibility)
     orbValueUsd: number;
   };
 
@@ -89,18 +89,18 @@ export async function getTruePnL(
   // Calculate current holdings
   const totalSol = currentWalletSol + currentAutomationSol + currentClaimableSol;
 
-  // Bot ORB (wallet + claimable)
+  // Bot LODE (wallet + claimable)
   const botOrb = currentWalletOrb + currentClaimableOrb;
 
-  // Total ORB including staked (for display only)
+  // Total LODE including staked (for display only)
   const totalOrb = botOrb + currentStakedOrb;
   const orbValueSol = totalOrb * orbPriceSol;
   const orbValueUsd = totalOrb * orbPriceSol * solPriceUsd;
 
-  // Current balance for PnL = ONLY SOL (ORB only counts as profit when sold)
+  // Current balance for PnL = ONLY SOL (LODE only counts as profit when sold)
   const currentBalance = totalSol;
 
-  // Calculate profit (ORB is NOT counted until sold)
+  // Calculate profit (LODE is NOT counted until sold)
   const profit = currentBalance - startingBalance;
   const profitUsd = profit * solPriceUsd;
 
@@ -141,12 +141,12 @@ export interface DetailedBreakdown {
   // Income sources
   income: {
     solFromMining: number; // claim_sol transactions
-    orbFromMining: number; // claim_orb transactions
-    orbFromStaking: number; // staking rewards
-    solFromSwaps: number; // swap transactions (ORB → SOL)
-    orbSwappedCount: number; // Amount of ORB swapped
+    orbFromMining: number; // claim_orb transactions (variable name kept for compatibility)
+    orbFromStaking: number; // staking rewards (variable name kept for compatibility)
+    solFromSwaps: number; // swap transactions (LODE → SOL)
+    orbSwappedCount: number; // Amount of LODE swapped (variable name kept for compatibility)
     totalSolIncome: number; // solFromMining + solFromSwaps
-    totalOrbIncome: number; // orbFromMining + orbFromStaking
+    totalOrbIncome: number; // orbFromMining + orbFromStaking (variable name kept for compatibility)
   };
 
   // Expense breakdown
@@ -165,7 +165,7 @@ export interface DetailedBreakdown {
     totalClaims: number;
     totalSwaps: number;
     totalStakes: number;
-    avgOrbPriceUsd: number;
+    avgOrbPriceUsd: number; // Average LODE price in USD (variable name kept for compatibility)
     firstActivity: number | null; // Timestamp
     lastActivity: number | null; // Timestamp
   };
@@ -197,7 +197,7 @@ export async function getDetailedBreakdown(): Promise<DetailedBreakdown> {
   `);
 
   // Get staking rewards (claim_yield transactions, NOT stake transactions)
-  // NOTE: Stake transactions are just moving ORB, not earning it
+  // NOTE: Stake transactions are just moving LODE, not earning it
   const stakingQuery = await getQuery<{ orb_from_staking: number }>(`
     SELECT COALESCE(SUM(orb_amount), 0) as orb_from_staking
     FROM transactions
@@ -339,7 +339,7 @@ export async function getCompletePnLSummary(
     netProfitUsd: truePnL.profitUsd,
     roi: truePnL.roi,
     totalValue: truePnL.currentBalance,
-    // Total income = only SOL income (ORB only counts when swapped)
+    // Total income = only SOL income (LODE only counts when swapped)
     totalIncome: breakdown.income.totalSolIncome,
     totalExpenses: breakdown.expenses.totalExpenses,
     isProfitable: truePnL.profit > 0,
@@ -359,9 +359,9 @@ export async function getCompletePnLSummary(
 export interface BalanceSnapshot {
   timestamp: number;
   totalSol: number;
-  totalOrb: number;
-  totalValue: number; // SOL + ORB value
-  orbPriceUsd: number;
+  totalOrb: number; // Variable name kept for compatibility
+  totalValue: number; // SOL + LODE value
+  orbPriceUsd: number; // Variable name kept for compatibility
 }
 
 /**
@@ -393,7 +393,7 @@ export async function getBalanceHistory(limit: number = 100): Promise<BalanceSna
     LIMIT ?
   `, [limit]);
 
-  // Get latest ORB price in SOL for value calculation
+  // Get latest LODE price in SOL for value calculation
   const latestPrice = await getQuery<{ orb_price_sol: number }>(`
     SELECT orb_price_sol FROM prices ORDER BY timestamp DESC LIMIT 1
   `);
@@ -500,7 +500,7 @@ export function formatSol(amount: number): string {
 }
 
 /**
- * Format ORB amount with proper decimals
+ * Format LODE amount with proper decimals (function name kept for compatibility)
  */
 export function formatOrb(amount: number): string {
   return amount.toFixed(2);

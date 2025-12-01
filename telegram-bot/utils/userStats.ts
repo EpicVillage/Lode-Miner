@@ -175,7 +175,7 @@ export function formatTransactionForDisplay(tx: any): string {
   const solscanLink = tx.signature ? `[Solscan](https://solscan.io/tx/${tx.signature})` : '';
 
   if (tx.orb_amount && tx.orb_amount > 0) {
-    details += `\n   🔮 ${tx.orb_amount.toFixed(4)} ORB${solscanLink ? ` | ${solscanLink}` : ''}`;
+    details += `\n   🔮 ${tx.orb_amount.toFixed(4)} LODE${solscanLink ? ` | ${solscanLink}` : ''}`;
   }
 
   if (tx.sol_amount && tx.sol_amount > 0) {

@@ -7,7 +7,7 @@ import { recordTransaction } from '../../src/utils/database';
 import logger from '../../src/utils/logger';
 import { Platform, getUserWallet, getUserSettings } from '../database';
 
-const ORB_PROGRAM_ID = new PublicKey('boreXQWsKpsJz5RR9BMtN8Vk4ndAk23sutj8spWYhwk');
+const LODE_PROGRAM_ID = new PublicKey('main99FJE8twaLPzw9nr3GqnSTVg8h4nyiMEDutnx64'); // LODE program
 
 export interface AutomationInfo {
   pda: PublicKey;
@@ -88,7 +88,7 @@ function buildCloseAutomationInstruction(publicKey: PublicKey): TransactionInstr
 
   return new TransactionInstruction({
     keys,
-    programId: ORB_PROGRAM_ID,
+    programId: LODE_PROGRAM_ID,
     data,
   });
 }
@@ -178,10 +178,10 @@ export async function startAutomation(
     }
 
     // Get motherload for logging
-    let motherloadOrb = 0;
+    let motherloadLode = 0;
     try {
       const treasury = await fetchTreasury();
-      motherloadOrb = Number(treasury.motherlode) / 1e9;
+      motherloadLode = Number(treasury.motherlode) / 1e9;
     } catch {
       logger.debug('[Shared Automation] Could not fetch treasury for logging');
     }
@@ -220,7 +220,7 @@ export async function startAutomation(
         signature,
         solAmount: deposit,
         status: 'success',
-        notes: `${platform}:${platformId} started: ${targetRounds} rounds @ ${solPerRound.toFixed(4)} SOL/round (motherload: ${motherloadOrb.toFixed(2)} ORB)`,
+        notes: `${platform}:${platformId} started: ${targetRounds} rounds @ ${solPerRound.toFixed(4)} SOL/round (motherload: ${motherloadLode.toFixed(2)} LODE)`,
         orbPriceUsd,
         txFeeSol: 0.005,
         walletAddress: wallet.publicKey.toBase58(),

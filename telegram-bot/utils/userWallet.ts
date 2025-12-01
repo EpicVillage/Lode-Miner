@@ -3,6 +3,7 @@ import bs58 from 'bs58';
 import { getUserPrivateKey } from './userDatabase';
 import { getConnection } from '../../src/utils/solana';
 import { getSolBalance as getGlobalSolBalance, getOrbBalance as getGlobalOrbBalance } from '../../src/utils/wallet';
+import { getConfig } from '../../src/utils/config';
 import logger from '../../src/utils/logger';
 
 /**
@@ -94,12 +95,12 @@ export async function getUserOrbBalance(telegramId: string): Promise<number> {
   }
 
   try {
-    // Temporarily set the wallet context to get ORB balance
-    // This is a workaround - ideally we'd refactor getOrbBalance to accept a public key
+    // Get LODE token balance for user wallet
     const connection = getConnection();
+    const config = getConfig();
     const tokenAccounts = await connection.getTokenAccountsByOwner(
       wallet.publicKey,
-      { mint: new PublicKey('orebyr4mDiPDVgnfqvF5xiu5gKnh94Szuz8dqgNqdJn') } // ORB mint
+      { mint: config.lodeTokenMint } // LODE token mint
     );
 
     if (tokenAccounts.value.length === 0) {
@@ -109,7 +110,7 @@ export async function getUserOrbBalance(telegramId: string): Promise<number> {
     const balance = await connection.getTokenAccountBalance(tokenAccounts.value[0].pubkey);
     return parseFloat(balance.value.uiAmount?.toString() || '0');
   } catch (error) {
-    logger.error(`[User Wallet] Failed to get ORB balance for ${telegramId}:`, error);
+    logger.error(`[User Wallet] Failed to get LODE balance for ${telegramId}:`, error);
     return 0;
   }
 }

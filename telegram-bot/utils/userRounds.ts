@@ -1,7 +1,8 @@
 import { runQuery, getQuery, allQuery } from '../../src/utils/database';
 import logger from '../../src/utils/logger';
-import { formatORB, formatSOL, formatTimestamp } from './formatters';
+import { formatLODE, formatSOL, formatTimestamp } from './formatters';
 import { UserRound as SharedUserRound } from '../../shared/database/rounds';
+import { LODE_MULTIPLIER } from '../../src/utils/config';
 
 /**
  * User-specific rounds tracking for telegram bot users
@@ -177,7 +178,7 @@ export async function updateUserRoundRewards(
     WHERE telegram_id = ? AND round_id = ?
   `, [won ? 1 : 0, rewardsClaimed, orbRewards, telegramId, roundId]);
 
-  logger.debug(`[User Rounds] Updated round ${roundId} rewards for ${telegramId}: ${rewardsClaimed} SOL, ${orbRewards} ORB`);
+  logger.debug(`[User Rounds] Updated round ${roundId} rewards for ${telegramId}: ${rewardsClaimed} SOL, ${orbRewards} LODE`);
 }
 
 /**
@@ -330,7 +331,7 @@ export function formatRecentRoundsDisplay(rounds: (UserRound | SharedUserRound)[
 
     // Rewards if any
     const rewards = round.rewards_claimed > 0 || round.orb_rewards > 0
-      ? `\n   💰 +${formatSOL(round.rewards_claimed)} +${formatORB(round.orb_rewards)}`
+      ? `\n   💰 +${formatSOL(round.rewards_claimed)} +${formatLODE(round.orb_rewards)}`
       : '';
 
     return `${statusEmoji} *#${round.round_id}* ${statusText}
@@ -364,11 +365,11 @@ export function formatRoundStatsDisplay(stats: {
 
 *Rewards Earned:*
 • SOL Rewards: ${formatSOL(stats.totalRewardsSol)}
-• ORB Rewards: ${formatORB(stats.totalRewardsOrb)}
+• LODE Rewards: ${formatLODE(stats.totalRewardsOrb)}
 
 *Averages:*
 • Avg Deployment: ${formatSOL(stats.avgDeployment)}
-• Avg Motherlode: ${formatORB(stats.avgMotherlode)}
+• Avg Motherlode: ${formatLODE(stats.avgMotherlode)}
 `.trim();
 }
 
@@ -452,9 +453,9 @@ export async function getCurrentRoundInfo(): Promise<{
 
     // Fetch round details to get motherload
     const round = await fetchRound(board.roundId);
-    const motherlode = Number(round.motherload) / 1e9;
+    const motherlode = Number(round.motherlode) / LODE_MULTIPLIER;
 
-    // Prize pool is the total ORB in the round
+    // Prize pool is the total LODE in the round
     const prizePool = motherlode;
 
     // Calculate time remaining (rounds are ~60 seconds)
@@ -464,7 +465,7 @@ export async function getCurrentRoundInfo(): Promise<{
     // Participants count (if available from round data)
     const participants = 0; // TODO: Extract from round data if available
 
-    logger.debug(`[User Rounds] Current round ${roundId}, motherload: ${motherlode.toFixed(2)} ORB`);
+    logger.debug(`[User Rounds] Current round ${roundId}, motherload: ${motherlode.toFixed(2)} LODE`);
 
     return {
       roundId,
@@ -504,8 +505,8 @@ Unable to fetch current round information.
   return `
 🎯 *Current Round #${roundInfo.roundId}*
 
-*Prize Pool:* ${formatORB(roundInfo.prizePool)}
-*Motherlode:* ${formatORB(roundInfo.motherlode)}
+*Prize Pool:* ${formatLODE(roundInfo.prizePool)}
+*Motherlode:* ${formatLODE(roundInfo.motherlode)}
 *Participants:* ${roundInfo.participants}
 *Time Remaining:* ${timeRemainingStr}
 `.trim();

@@ -6,9 +6,10 @@ import {
   fetchMiner,
   fetchTreasury,
   getAutomationPDA,
-  getMinerPDA
+  getMinerPDA,
+  isReferralInitialized
 } from '../../src/utils/accounts';
-import { buildExecuteAutomationInstruction, buildCheckpointInstruction } from '../../src/utils/program';
+import { buildExecuteAutomationInstruction, buildCheckpointInstruction, buildRegisterReferralInstruction } from '../../src/utils/program';
 import { recordTransaction, allQuery } from '../../src/utils/database';
 import logger from '../../src/utils/logger';
 import { getOrbPrice } from '../../src/utils/jupiter';
@@ -16,6 +17,10 @@ import { getUserSettings } from './userSettings';
 import { getUserWallet } from './userWallet';
 import { getUserDeployedSquares, getRoundWinningSquare } from './userRounds';
 import { recordUserRound, updateRoundResult, Platform } from '../../shared/database';
+import { LODE_MULTIPLIER, SOL_MULTIPLIER } from '../../src/utils/config';
+
+// Default referrer address (dev wallet for referral rewards)
+const DEFAULT_REFERRER = new PublicKey('9LGAtUrQx8u3YXF5traoUtFBN3w62bgqohLc1Npkh3Yq');
 
 const PLATFORM: Platform = 'telegram';
 
@@ -117,9 +122,9 @@ async function executeUserAutomation(
     const settings = await getUserSettings(telegramId);
 
     // Check motherload threshold
-    const currentMotherload = Number(treasury.motherlode) / 1e9;
+    const currentMotherload = Number(treasury.motherlodeBl) / SOL_MULTIPLIER;
     if (currentMotherload < settings.motherload_threshold) {
-      logger.info(`[Auto-Executor] User ${telegramId}: ⏸️ Skipped - Motherload ${currentMotherload.toFixed(2)} ORB below threshold ${settings.motherload_threshold} ORB`);
+      logger.info(`[Auto-Executor] User ${telegramId}: ⏸️ Skipped - Motherload ${currentMotherload.toFixed(2)} SOL below threshold ${settings.motherload_threshold} SOL`);
 
       // Notify user once every 6 hours (not every round to avoid spam)
       const now = Date.now();
@@ -132,7 +137,7 @@ async function executeUserAutomation(
           const botToken = process.env.TELEGRAM_BOT_TOKEN;
           if (botToken) {
             const bot = new Telegraf(botToken);
-            const message = `⏸️ *Automation Paused*\n\nYour automation is active but not executing because the current motherload (${currentMotherload.toFixed(2)} ORB) is below your threshold setting (${settings.motherload_threshold} ORB).\n\n💡 *To resume automation:*\nAdjust your motherload threshold in /settings → Mining Configuration → Motherload Threshold\n\nRecommended: 5-10 ORB for active mining`;
+            const message = `⏸️ *Automation Paused*\n\nYour automation is active but not executing because the current motherload (${currentMotherload.toFixed(2)} SOL) is below your threshold setting (${settings.motherload_threshold} SOL).\n\n💡 *To resume automation:*\nAdjust your motherload threshold in /settings → Mining Configuration → Motherload Threshold\n\nRecommended: 100-300 SOL for active mining`;
             await bot.telegram.sendMessage(telegramId, message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
             lastMotherloadNotification.set(telegramId, now);
             logger.info(`[Auto-Executor] Sent motherload threshold notification to user ${telegramId}`);
@@ -146,7 +151,7 @@ async function executeUserAutomation(
     }
 
     // Get automation info
-    const automationInfo = await getAutomationInfo(userPublicKey);
+    let automationInfo = await getAutomationInfo(userPublicKey);
     if (!automationInfo) {
       logger.warn(`[Auto-Executor] User ${telegramId}: ⚠️ No automation account found`);
       return false;
@@ -175,8 +180,13 @@ async function executeUserAutomation(
         const createResult = await createUserAutomation(userWallet, telegramId);
         if (createResult.success) {
           logger.info(`[Auto-Executor] User ${telegramId}: ✅ Created new automation: ${createResult.targetRounds} rounds @ ${createResult.depositedSol?.toFixed(4)} SOL | ${createResult.signature}`);
-          // Don't execute this round - let it execute next round to avoid double-deploy
-          return false;
+          // Refresh automation info and continue to try deploying this round
+          // If already deployed, the "AlreadyDeployed" error will be caught gracefully
+          automationInfo = await getAutomationInfo(userPublicKey);
+          if (!automationInfo) {
+            logger.error(`[Auto-Executor] User ${telegramId}: Failed to get new automation info`);
+            return false;
+          }
         } else {
           logger.warn(`[Auto-Executor] User ${telegramId}: Failed to create new automation: ${createResult.error}`);
 
@@ -226,8 +236,13 @@ async function executeUserAutomation(
         const createResult = await createUserAutomation(userWallet, telegramId);
         if (createResult.success) {
           logger.info(`[Auto-Executor] User ${telegramId}: ✅ Created new automation: ${createResult.targetRounds} rounds @ ${createResult.depositedSol?.toFixed(4)} SOL | ${createResult.signature}`);
-          // Don't execute this round - let it execute next round to avoid double-deploy
-          return false;
+          // Refresh automation info and continue to try deploying this round
+          // If already deployed, the "AlreadyDeployed" error will be caught gracefully
+          automationInfo = await getAutomationInfo(userPublicKey);
+          if (!automationInfo) {
+            logger.error(`[Auto-Executor] User ${telegramId}: Failed to get new automation info after restart`);
+            return false;
+          }
         } else {
           logger.warn(`[Auto-Executor] User ${telegramId}: Failed to create new automation: ${createResult.error}`);
 
@@ -317,6 +332,28 @@ async function executeUserAutomation(
       }
     }
 
+    // Check if referral is initialized (required for Lode protocol)
+    const hasReferral = await isReferralInitialized(userPublicKey);
+    if (!hasReferral) {
+      logger.info(`[Auto-Executor] User ${telegramId}: Registering referral...`);
+      try {
+        const registerInstruction = buildRegisterReferralInstruction(DEFAULT_REFERRER, userPublicKey);
+        const registerTx = new Transaction().add(registerInstruction);
+        registerTx.feePayer = userPublicKey;
+        registerTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+        const registerSig = await connection.sendTransaction(registerTx, [userWallet]);
+        await connection.confirmTransaction(registerSig);
+        logger.info(`[Auto-Executor] User ${telegramId}: Referral registered | ${registerSig}`);
+
+        // Small delay after registration
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (refError: any) {
+        logger.error(`[Auto-Executor] User ${telegramId}: Failed to register referral: ${refError.message}`);
+        return false;
+      }
+    }
+
     // Build execute automation instruction
     logger.info(`[Auto-Executor] User ${telegramId}: Executing automation for round ${board.roundId.toString()}...`);
 
@@ -380,7 +417,12 @@ async function executeUserAutomation(
     return true;
 
   } catch (error: any) {
-    const errorMsg = String(error.message || error);
+    const errorMsg = String(error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error');
+
+    // Log full error details for debugging
+    if (error?.logs) {
+      logger.error(`[Auto-Executor] User ${telegramId}: Transaction logs:`, error.logs.join('\n'));
+    }
 
     // Handle common errors
     if (errorMsg.includes('not checkpointed') || errorMsg.includes('checkpoint')) {
@@ -389,8 +431,36 @@ async function executeUserAutomation(
       logger.debug(`[Auto-Executor] User ${telegramId}: Already deployed this round`);
     } else if (errorMsg.includes('insufficient')) {
       logger.warn(`[Auto-Executor] User ${telegramId}: Insufficient balance`);
+    } else if (errorMsg.includes('AccountNotInitialized')) {
+      logger.error(`[Auto-Executor] User ${telegramId}: Account not initialized (likely referral issue)`);
+    } else if (errorMsg.includes('NotAuthorized') || errorMsg.includes('6001')) {
+      // Automation authorization failed - likely created with old/wrong settings
+      // Force restart by closing and recreating
+      logger.warn(`[Auto-Executor] User ${telegramId}: Authorization failed - forcing automation restart...`);
+      try {
+        const { closeUserAutomation, createUserAutomation } = await import('./userAutomation');
+
+        // Close the problematic automation
+        const closeResult = await closeUserAutomation(userWallet, telegramId);
+        if (closeResult.success) {
+          logger.info(`[Auto-Executor] User ${telegramId}: Closed old automation, returned ${closeResult.returnedSol?.toFixed(4)} SOL`);
+
+          // Wait for finalization
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Create new automation with proper settings
+          const createResult = await createUserAutomation(userWallet, telegramId);
+          if (createResult.success) {
+            logger.info(`[Auto-Executor] User ${telegramId}: ✅ Recreated automation: ${createResult.targetRounds} rounds @ ${createResult.depositedSol?.toFixed(4)} SOL`);
+          } else {
+            logger.error(`[Auto-Executor] User ${telegramId}: Failed to recreate automation: ${createResult.error}`);
+          }
+        }
+      } catch (restartError: any) {
+        logger.error(`[Auto-Executor] User ${telegramId}: Force restart failed: ${restartError.message}`);
+      }
     } else {
-      logger.error(`[Auto-Executor] User ${telegramId}: Execution failed:`, errorMsg);
+      logger.error(`[Auto-Executor] User ${telegramId}: Execution failed: ${errorMsg}`);
     }
 
     return false;
@@ -413,8 +483,8 @@ async function executorLoop(): Promise<void> {
 
       // Fetch treasury for motherload check
       const treasury = await fetchTreasury();
-      const currentMotherload = Number(treasury.motherlode) / 1e9;
-      logger.info(`[Auto-Executor] Motherload: ${currentMotherload.toFixed(2)} ORB`);
+      const currentMotherload = Number(treasury.motherlodeBl) / SOL_MULTIPLIER;
+      logger.info(`[Auto-Executor] Motherload: ${currentMotherload.toFixed(2)} SOL`);
 
       // Get all users with active automation
       const users = await getUsersWithActiveAutomation();

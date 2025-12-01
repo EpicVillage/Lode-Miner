@@ -10,8 +10,10 @@ import {
   getLinkedAccount
 } from './users';
 
-// ORB token mint address
-const ORB_MINT = new PublicKey('orebyr4mDiPDVgnfqvF5xiu5gKnh94Szuz8dqgNqdJn');
+// LODE token mint address (previously ORB)
+const LODE_MINT = new PublicKey('CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode');
+// Backwards compatibility alias
+const ORB_MINT = LODE_MINT;
 
 /**
  * Shared Wallet Operations
@@ -127,7 +129,7 @@ export async function getUserBalances(platform: Platform, platformId: string): P
     const solBalance = await connection.getBalance(publicKey);
     const sol = solBalance / LAMPORTS_PER_SOL;
 
-    // Fetch ORB balance
+    // Fetch LODE balance
     let orb = 0;
     try {
       const tokenAccounts = await connection.getTokenAccountsByOwner(
@@ -139,7 +141,7 @@ export async function getUserBalances(platform: Platform, platformId: string): P
         orb = parseFloat(balance.value.uiAmount?.toString() || '0');
       }
     } catch (tokenError) {
-      logger.debug(`[Shared Wallet] No ORB token account for ${platform}:${platformId}`);
+      logger.debug(`[Shared Wallet] No LODE token account for ${platform}:${platformId}`);
     }
 
     return {

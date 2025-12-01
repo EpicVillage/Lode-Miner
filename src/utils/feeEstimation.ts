@@ -315,7 +315,8 @@ export async function buildComputeBudgetInstructions(
 export const COMPUTE_UNIT_LIMITS = {
   DEPLOY: 300000,      // Mining deployment (complex, involves automation PDA)
   CLAIM_SOL: 50000,    // Simple SOL claim
-  CLAIM_ORB: 150000,   // ORB claim (involves token accounts)
+  CLAIM_LODE: 150000,  // LODE claim (involves token accounts)
+  CLAIM_ORB: 150000,   // Alias for backwards compatibility
   STAKE: 100000,       // Staking operation
   SWAP: 400000,        // Jupiter swap (most complex)
   CHECKPOINT: 200000,  // Checkpoint operation

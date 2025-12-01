@@ -8,13 +8,20 @@ import {
   initializeDefaultSettings
 } from './settingsLoader';
 
+// LODE token has 11 decimals (verified from on-chain mint account)
+export const LODE_DECIMALS = 11;
+export const LODE_MULTIPLIER = 1e11;
+// SOL has 9 decimals
+export const SOL_DECIMALS = 9;
+export const SOL_MULTIPLIER = 1e9;
+
 export interface Config {
   // Wallet & Network
   privateKey: string;
   rpcEndpoint: string;
-  orbProgramId: PublicKey;
-  orbTokenMint: PublicKey;
-  orbFeeCollector: PublicKey;
+  lodeProgramId: PublicKey;
+  lodeTokenMint: PublicKey;
+  lodeFeeCollector: PublicKey;
   network: string;
 
   // Bot Action
@@ -49,27 +56,27 @@ export interface Config {
 
   // Smart Bot - Auto-Claim Thresholds
   autoClaimSolThreshold: number;
-  autoClaimOrbThreshold: number;
-  autoClaimStakingOrbThreshold: number;
+  autoClaimOrbThreshold: number; // Database column name kept for compatibility
+  autoClaimStakingOrbThreshold: number; // Database column name kept for compatibility
   checkRewardsIntervalMs: number;
   checkStakingRewardsIntervalMs: number;
 
   // Claim Settings (legacy - for backward compatibility)
   autoClaimEnabled: boolean;
   claimThresholdSol: number;
-  claimThresholdOrb: number;
+  claimThresholdOrb: number; // Database column name kept for compatibility
   claimType: 'sol' | 'orb' | 'both';
   claimFromMining: boolean;
   claimFromStaking: boolean;
 
   // Smart Bot - Auto-Swap Settings
   autoSwapEnabled: boolean;
-  walletOrbSwapThreshold: number;
-  minOrbPriceUsd: number;
+  walletOrbSwapThreshold: number; // Database column name kept for compatibility
+  minOrbPriceUsd: number; // Database column name kept for compatibility
 
   // Smart Bot - Auto-Stake Settings
   autoStakeEnabled: boolean;
-  stakeOrbThreshold: number;
+  stakeOrbThreshold: number; // Database column name kept for compatibility
 
   // Auto-Deploy Settings (legacy)
   autoDeployIterations: number;
@@ -81,9 +88,9 @@ export interface Config {
   // Jupiter Integration (legacy)
   enableJupiterSwap: boolean;
   autoSwapWhenLowSol: boolean;
-  swapOrbAmount: number;
-  minOrbToKeep: number;
-  minOrbSwapAmount: number;
+  swapOrbAmount: number; // Database column name kept for compatibility
+  minOrbToKeep: number; // Database column name kept for compatibility
+  minOrbSwapAmount: number; // Database column name kept for compatibility
   slippageBps: number;
   swapPriorityFeeLamports: number | 'auto';
   jupiterApiUrl: string;
@@ -125,9 +132,9 @@ export async function loadConfigWithDB(): Promise<Config> {
       // Note: PRIVATE_KEY may be empty on first run - wizard will handle this
       privateKey: getSettingValue(dbSettings, 'PRIVATE_KEY', ''),
       rpcEndpoint: process.env.SOLANA_RPC_URL || getSettingValue(dbSettings, 'RPC_ENDPOINT', 'https://api.mainnet-beta.solana.com'),
-      orbProgramId: new PublicKey(getSettingValue(dbSettings, 'ORB_PROGRAM_ID', 'boreXQWsKpsJz5RR9BMtN8Vk4ndAk23sutj8spWYhwk')),
-      orbTokenMint: new PublicKey(getSettingValue(dbSettings, 'ORB_TOKEN_MINT', 'orebyr4mDiPDVgnfqvF5xiu5gKnh94Szuz8dqgNqdJn')),
-      orbFeeCollector: new PublicKey(getSettingValue(dbSettings, 'ORB_FEE_COLLECTOR', '9LGAtUrQx8u3YXF5traoUtFBN3w62bgqohLc1Npkh3Yq')),
+      lodeProgramId: new PublicKey(getSettingValue(dbSettings, 'LODE_PROGRAM_ID', 'main99FJE8twaLPzw9nr3GqnSTVg8h4nyiMEDutnx64')),
+      lodeTokenMint: new PublicKey(getSettingValue(dbSettings, 'LODE_TOKEN_MINT', 'CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode')), // LODE token mint address
+      lodeFeeCollector: new PublicKey(getSettingValue(dbSettings, 'LODE_FEE_COLLECTOR', '9LGAtUrQx8u3YXF5traoUtFBN3w62bgqohLc1Npkh3Yq')),
       network: getSettingValue(dbSettings, 'NETWORK', 'mainnet-beta'),
 
       // Bot Action

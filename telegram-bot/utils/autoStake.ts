@@ -3,7 +3,7 @@ import logger from '../../src/utils/logger';
 import { getUserSettings } from './userSettings';
 import { getUserBalances } from './userWallet';
 import { stakeUserOrb } from './userStaking';
-import { formatORB } from './formatters';
+import { formatLODE } from './formatters';
 import { Telegraf } from 'telegraf';
 
 /**
@@ -78,13 +78,13 @@ async function processUserAutoStake(telegramId: string): Promise<void> {
       return;
     }
 
-    logger.info(`[Auto-Stake] ${telegramId}: Staking ${stakeAmount.toFixed(2)} ORB (balance: ${balances.orb.toFixed(2)}, keeping: ${settings.min_orb_to_keep})`);
+    logger.info(`[Auto-Stake] ${telegramId}: Staking ${stakeAmount.toFixed(2)} LODE (balance: ${balances.orb.toFixed(2)}, keeping: ${settings.min_orb_to_keep})`);
 
     // Execute stake
     const result = await stakeUserOrb(telegramId, stakeAmount);
 
     if (result.success) {
-      const message = `✅ *Auto-Stake Successful*\n\nStaked: ${formatORB(stakeAmount)} ORB\n\nYour ORB is now earning staking rewards!\n\nTransaction: \`${result.signature}\``;
+      const message = `✅ *Auto-Stake Successful*\n\nStaked: ${formatLODE(stakeAmount)} LODE\n\nYour LODE is now earning staking rewards!\n\nTransaction: \`${result.signature}\``;
 
       // Send notification
       if (bot) {
@@ -95,14 +95,14 @@ async function processUserAutoStake(telegramId: string): Promise<void> {
         }
       }
 
-      logger.info(`[Auto-Stake] ${telegramId}: Staked ${stakeAmount.toFixed(2)} ORB | ${result.signature}`);
+      logger.info(`[Auto-Stake] ${telegramId}: Staked ${stakeAmount.toFixed(2)} LODE | ${result.signature}`);
     } else {
       logger.warn(`[Auto-Stake] ${telegramId}: Stake failed - ${result.error}`);
 
       // Send error notification
       if (bot) {
         try {
-          const errorMessage = `⚠️ *Auto-Stake Failed*\n\nFailed to stake ${formatORB(stakeAmount)} ORB\n\nError: ${result.error}\n\nPlease check your balance or try manual staking.`;
+          const errorMessage = `⚠️ *Auto-Stake Failed*\n\nFailed to stake ${formatLODE(stakeAmount)} LODE\n\nError: ${result.error}\n\nPlease check your balance or try manual staking.`;
           await bot.telegram.sendMessage(telegramId, errorMessage, { parse_mode: 'Markdown' });
         } catch (error) {
           logger.warn(`[Auto-Stake] Failed to send error notification to ${telegramId}:`, error);

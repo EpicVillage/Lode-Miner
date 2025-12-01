@@ -1,0 +1,708 @@
+{
+  "address": "main99FJE8twaLPzw9nr3GqnSTVg8h4nyiMEDutnx64",
+  "metadata": {
+    "name": "lode_program",
+    "version": "3.7.5",
+    "spec": "0.1.0",
+    "description": "Solana native store of value - Anchor implementation"
+  },
+  "instructions": [
+    {
+      "name": "automate",
+      "docs": ["Configure automation"],
+      "discriminator": [84, 106, 174, 94, 7, 64, 22, 130],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        {
+          "name": "automation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [97, 117, 116, 111, 109, 97, 116, 105, 111, 110] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "executor", "docs": ["Executor account - the bot/service that will execute deployments"] },
+        {
+          "name": "referral",
+          "docs": ["Referral account - required to deploy"],
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [114, 101, 102, 101, 114, 114, 97, 108] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        {
+          "name": "miner",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 105, 110, 101, 114] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "args", "type": { "defined": { "name": "AutomateArgs" } } }]
+    },
+    {
+      "name": "cancel_automate",
+      "docs": ["Cancel automation and withdraw all funds"],
+      "discriminator": [247, 104, 181, 222, 216, 159, 79, 180],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        {
+          "name": "automation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [97, 117, 116, 111, 109, 97, 116, 105, 111, 110] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "checkpoint",
+      "docs": ["Checkpoint miner rewards"],
+      "discriminator": [213, 200, 19, 204, 240, 143, 184, 252],
+      "accounts": [
+        { "name": "signer", "writable": true, "signer": true },
+        {
+          "name": "board",
+          "pda": { "seeds": [{ "kind": "const", "value": [98, 111, 97, 114, 100] }] }
+        },
+        {
+          "name": "miner",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 105, 110, 101, 114] },
+              { "kind": "account", "path": "miner.authority", "account": "Miner" }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [114, 111, 117, 110, 100] },
+              { "kind": "account", "path": "miner.round_id", "account": "Miner" }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        {
+          "name": "referral",
+          "docs": ["Referral account - auto-resolved from miner.authority"],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [114, 101, 102, 101, 114, 114, 97, 108] },
+              { "kind": "account", "path": "miner.authority", "account": "Miner" }
+            ]
+          }
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_sol",
+      "docs": ["Claim SOL rewards"],
+      "discriminator": [139, 113, 179, 189, 190, 30, 132, 195],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        {
+          "name": "miner",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 105, 110, 101, 114] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_token",
+      "docs": ["Claim TOKEN token rewards"],
+      "discriminator": [116, 206, 27, 191, 166, 19, 0, 73],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        {
+          "name": "miner",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 105, 110, 101, 114] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        {
+          "name": "premine",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [112, 114, 101, 109, 105, 110, 101] }] }
+        },
+        { "name": "mint", "writable": true, "address": "CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode" },
+        { "name": "treasury_tokens", "writable": true },
+        { "name": "recipient", "writable": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "associated_token_program", "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "deploy",
+      "docs": ["Deploy SOL to squares on the game board"],
+      "discriminator": [67, 36, 143, 118, 36, 164, 92, 217],
+      "accounts": [
+        { "name": "signer", "writable": true, "signer": true },
+        { "name": "authority", "writable": true },
+        {
+          "name": "config",
+          "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] }
+        },
+        {
+          "name": "automation",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [97, 117, 116, 111, 109, 97, 116, 105, 111, 110] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [98, 111, 97, 114, 100] }] }
+        },
+        {
+          "name": "miner",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 105, 110, 101, 114] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [114, 111, 117, 110, 100] },
+              { "kind": "account", "path": "board.round_id", "account": "Board" }
+            ]
+          }
+        },
+        { "name": "entropy_var", "writable": true },
+        { "name": "entropy_program" },
+        {
+          "name": "referral",
+          "docs": ["Referral account - required to deploy"],
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [114, 101, 102, 101, 114, 114, 97, 108] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" },
+        { "name": "squares", "type": "u32" }
+      ]
+    },
+    {
+      "name": "register_referral",
+      "docs": ["Register a referral relationship"],
+      "discriminator": [158, 196, 134, 102, 193, 102, 184, 86],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        { "name": "referrer" },
+        {
+          "name": "referral",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [114, 101, 102, 101, 114, 114, 97, 108] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_referral_rewards",
+      "docs": ["Claim referral rewards from multiple referees"],
+      "discriminator": [23, 112, 76, 162, 157, 106, 203, 246],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        {
+          "name": "premine",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [112, 114, 101, 109, 105, 110, 101] }] }
+        },
+        { "name": "mint", "address": "CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode" },
+        { "name": "treasury_tokens", "writable": true },
+        { "name": "recipient", "writable": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "associated_token_program", "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "stake_deposit",
+      "docs": ["Deposit TOKEN tokens into staking"],
+      "discriminator": [75, 168, 115, 239, 194, 115, 22, 98],
+      "accounts": [
+        { "name": "signer", "writable": true, "signer": true },
+        {
+          "name": "stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [115, 116, 97, 107, 101] },
+              { "kind": "account", "path": "signer" }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        { "name": "mint", "address": "CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode" },
+        { "name": "sender_tokens", "writable": true },
+        { "name": "stake_tokens", "writable": true },
+        { "name": "clock", "address": "SysvarC1ock11111111111111111111111111111111" },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "associated_token_program", "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "amount", "type": "u64" }]
+    },
+    {
+      "name": "stake_withdraw",
+      "docs": ["Withdraw TOKEN tokens from staking"],
+      "discriminator": [199, 13, 168, 20, 92, 151, 29, 56],
+      "accounts": [
+        { "name": "signer", "writable": true, "signer": true },
+        {
+          "name": "stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [115, 116, 97, 107, 101] },
+              { "kind": "account", "path": "signer" }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        { "name": "mint", "address": "CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode" },
+        { "name": "sender_tokens", "writable": true },
+        { "name": "stake_tokens", "writable": true },
+        { "name": "clock", "address": "SysvarC1ock11111111111111111111111111111111" },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "associated_token_program", "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "amount", "type": "u64" }]
+    },
+    {
+      "name": "stake_claim",
+      "docs": ["Claim SOL staking rewards"],
+      "discriminator": [206, 208, 31, 82, 213, 249, 175, 1],
+      "accounts": [
+        { "name": "signer", "writable": true, "signer": true },
+        {
+          "name": "stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [115, 116, 97, 107, 101] },
+              { "kind": "account", "path": "signer" }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        { "name": "recipient", "writable": true },
+        { "name": "clock", "address": "SysvarC1ock11111111111111111111111111111111" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "reset",
+      "docs": ["Reset round and start new one"],
+      "discriminator": [23, 81, 251, 84, 138, 183, 240, 214],
+      "accounts": [
+        { "name": "signer", "writable": true, "signer": true },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [98, 111, 97, 114, 100] }] }
+        },
+        {
+          "name": "config",
+          "pda": { "seeds": [{ "kind": "const", "value": [99, 111, 110, 102, 105, 103] }] }
+        },
+        { "name": "mint", "writable": true, "address": "CXBVSveFCtdih8mhVWtyrLcyPvpzNejCARHYhCzhLode" },
+        { "name": "current_round", "writable": true },
+        { "name": "next_round", "writable": true },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] }
+        },
+        { "name": "treasury_tokens", "writable": true },
+        { "name": "entropy_var", "writable": true },
+        { "name": "fee_collector", "writable": true },
+        {
+          "name": "premine",
+          "writable": true,
+          "pda": { "seeds": [{ "kind": "const", "value": [112, 114, 101, 109, 105, 110, 101] }] }
+        },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        { "name": "associated_token_program", "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "close",
+      "docs": ["Close miner account"],
+      "discriminator": [98, 165, 201, 177, 108, 65, 206, 96],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        {
+          "name": "miner",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 105, 110, 101, 114] },
+              { "kind": "account", "path": "authority" }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Automation",
+      "discriminator": [235, 214, 138, 190, 117, 163, 210, 233]
+    },
+    {
+      "name": "Board",
+      "discriminator": [79, 48, 160, 63, 153, 132, 240, 56]
+    },
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Miner",
+      "discriminator": [223, 113, 15, 54, 123, 122, 140, 100]
+    },
+    {
+      "name": "Premine",
+      "discriminator": [179, 10, 37, 217, 7, 87, 34, 198]
+    },
+    {
+      "name": "Referral",
+      "discriminator": [30, 235, 136, 224, 106, 107, 49, 64]
+    },
+    {
+      "name": "Round",
+      "discriminator": [87, 127, 165, 51, 73, 78, 116, 174]
+    },
+    {
+      "name": "Stake",
+      "discriminator": [150, 197, 176, 29, 55, 132, 112, 149]
+    },
+    {
+      "name": "Treasury",
+      "discriminator": [238, 239, 123, 238, 89, 1, 168, 253]
+    }
+  ],
+  "types": [
+    {
+      "name": "AutomateArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "amount", "type": "u64" },
+          { "name": "deposit", "type": "u64" },
+          { "name": "fee", "type": "u64" },
+          { "name": "mask", "type": "u64" },
+          { "name": "strategy", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Automation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "amount", "docs": ["The amount of SOL to deploy on each territory per round."], "type": "u64" },
+          { "name": "authority", "docs": ["The authority of this automation account."], "type": "pubkey" },
+          { "name": "balance", "docs": ["The amount of SOL this automation has left."], "type": "u64" },
+          { "name": "executor", "docs": ["The executor of this automation account."], "type": "pubkey" },
+          { "name": "fee", "docs": ["The amount of SOL the executor should receive in fees."], "type": "u64" },
+          { "name": "strategy", "docs": ["The strategy this automation uses."], "type": "u64" },
+          { "name": "mask", "docs": ["The mask of squares this automation should deploy to if preferred strategy."], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Board",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "round_id", "docs": ["The current round number."], "type": "u64" },
+          { "name": "start_slot", "docs": ["The slot at which the current round starts mining."], "type": "u64" },
+          { "name": "end_slot", "docs": ["The slot at which the current round ends mining."], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "admin", "docs": ["The address that can update the config."], "type": "pubkey" },
+          { "name": "bury_authority", "docs": ["The address with authority to call bury."], "type": "pubkey" },
+          { "name": "fee_collector", "docs": ["The address that receives admin fees."], "type": "pubkey" },
+          { "name": "swap_program", "docs": ["The program id for the protocol swaps."], "type": "pubkey" },
+          { "name": "var_address", "docs": ["The address of the entropy var account."], "type": "pubkey" },
+          { "name": "buffer", "docs": ["Buffer array"], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Miner",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "docs": ["The authority of this miner account."], "type": "pubkey" },
+          { "name": "deployed", "docs": ["The miner's prospects in the current round."], "type": { "array": ["u64", 25] } },
+          { "name": "cumulative", "docs": ["The cumulative amount of SOL deployed on each square prior to this miner's move."], "type": { "array": ["u64", 25] } },
+          { "name": "checkpoint_fee", "docs": ["SOL witheld in reserve to pay for checkpointing."], "type": "u64" },
+          { "name": "checkpoint_id", "docs": ["The last round that this miner checkpointed."], "type": "u64" },
+          { "name": "last_claim_token_at", "docs": ["The last time this miner claimed TOKEN rewards."], "type": "i64" },
+          { "name": "last_claim_sol_at", "docs": ["The last time this miner claimed SOL rewards."], "type": "i64" },
+          { "name": "rewards_factor", "docs": ["The rewards factor last time rewards were updated."], "type": { "defined": { "name": "Numeric" } } },
+          { "name": "rewards_sol", "docs": ["The amount of SOL this miner can claim."], "type": "u64" },
+          { "name": "rewards_token", "docs": ["The amount of TOKEN this miner can claim."], "type": "u64" },
+          { "name": "refined_token", "docs": ["The amount of TOKEN this miner has earned from claim fees."], "type": "u64" },
+          { "name": "round_id", "docs": ["The ID of the round this miner last played in."], "type": "u64" },
+          { "name": "lifetime_rewards_sol", "docs": ["The total amount of SOL this miner has mined."], "type": "u64" },
+          { "name": "lifetime_rewards_token", "docs": ["The total amount of TOKEN this miner has mined."], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Numeric",
+      "docs": ["A fixed-point numeric type for precise calculations"],
+      "type": {
+        "kind": "struct",
+        "fields": ["i128"]
+      }
+    },
+    {
+      "name": "Premine",
+      "docs": ["Premine account - holds SOL collected during premine mode"],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "is_enabled", "docs": ["Premine mode flag"], "type": "bool" },
+          { "name": "total_collected", "docs": ["Total SOL collected during premine mode"], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Referral",
+      "docs": ["Referral account - stores referral relationship and pending rewards"],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "docs": ["The authority (referee) who registered this referral"], "type": "pubkey" },
+          { "name": "referrer", "docs": ["The referrer who referred this user"], "type": "pubkey" },
+          { "name": "pending_rewards", "docs": ["Pending TOKEN rewards for referrer to claim"], "type": "u64" },
+          { "name": "claimed_rewards", "docs": ["Total TOKEN rewards already claimed by referrer"], "type": "u64" },
+          { "name": "created_at", "docs": ["Timestamp when the referral was created"], "type": "i64" }
+        ]
+      }
+    },
+    {
+      "name": "Round",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "id", "docs": ["The round number."], "type": "u64" },
+          { "name": "deployed", "docs": ["The amount of SOL deployed in each square."], "type": { "array": ["u64", 25] } },
+          { "name": "slot_hash", "docs": ["The hash of the end slot, used for random number generation."], "type": { "array": ["u8", 32] } },
+          { "name": "count", "docs": ["The count of miners on each square."], "type": { "array": ["u64", 25] } },
+          { "name": "expires_at", "docs": ["The slot at which claims for this round account end."], "type": "u64" },
+          { "name": "motherlode", "docs": ["The amount of TOKEN in the motherlode."], "type": "u64" },
+          { "name": "rent_payer", "docs": ["The account to which rent should be returned."], "type": "pubkey" },
+          { "name": "top_miner", "docs": ["The top miner of the round."], "type": "pubkey" },
+          { "name": "top_miner_reward", "docs": ["The amount of TOKEN to distribute to the top miner."], "type": "u64" },
+          { "name": "total_deployed", "docs": ["The total amount of SOL deployed in the round."], "type": "u64" },
+          { "name": "total_vaulted", "docs": ["The total amount of SOL put in the TOKEN vault."], "type": "u64" },
+          { "name": "total_stake_rewards", "docs": ["The total amount of SOL to staking rewards."], "type": "u64" },
+          { "name": "total_winnings", "docs": ["The total amount of SOL won by miners for the round."], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Stake",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "docs": ["The authority of this stake account."], "type": "pubkey" },
+          { "name": "balance", "docs": ["The balance of this stake account."], "type": "u64" },
+          { "name": "last_claim_at", "docs": ["The timestamp of last claim."], "type": "i64" },
+          { "name": "last_deposit_at", "docs": ["The timestamp the last time this staker deposited."], "type": "i64" },
+          { "name": "last_withdraw_at", "docs": ["The timestamp the last time this staker withdrew."], "type": "i64" },
+          { "name": "rewards_factor", "docs": ["The rewards factor last time rewards were updated."], "type": { "defined": { "name": "Numeric" } } },
+          { "name": "rewards", "docs": ["The amount of SOL this staker can claim."], "type": "u64" },
+          { "name": "lifetime_rewards", "docs": ["The total amount of SOL this staker has earned."], "type": "u64" },
+          { "name": "is_seeker", "docs": ["Deprecated field"], "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "Treasury",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "buyback_bl", "docs": ["The amount of SOL collected for buy-bury operations."], "type": "u64" },
+          { "name": "motherlode_bl", "docs": ["The amount of TOKEN in the motherlode rewards pool."], "type": "u64" },
+          { "name": "stake_rw_bl", "docs": ["The amount of SOL in the stake rewards."], "type": "u64" },
+          { "name": "miner_rewards_factor", "docs": ["The cumulative TOKEN distributed to miners."], "type": { "defined": { "name": "Numeric" } } },
+          { "name": "stake_rewards_factor", "docs": ["The cumulative SOL distributed to stakers."], "type": { "defined": { "name": "Numeric" } } },
+          { "name": "total_staked", "docs": ["The current total amount of TOKEN staking deposits."], "type": "u64" },
+          { "name": "total_unclaimed", "docs": ["The current total amount of unclaimed TOKEN mining rewards."], "type": "u64" },
+          { "name": "total_refined", "docs": ["The current total amount of refined TOKEN mining rewards."], "type": "u64" }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "ResetEvent",
+      "discriminator": [124, 22, 211, 189, 143, 47, 156, 222],
+      "fields": [
+        { "name": "round_id", "type": "u64" },
+        { "name": "start_slot", "type": "u64" },
+        { "name": "end_slot", "type": "u64" },
+        { "name": "winning_square", "type": "u64" },
+        { "name": "top_miner", "type": "pubkey" },
+        { "name": "num_winners", "type": "u64" },
+        { "name": "motherlode", "type": "u64" },
+        { "name": "total_deployed", "type": "u64" },
+        { "name": "total_vaulted", "type": "u64" },
+        { "name": "total_winnings", "type": "u64" },
+        { "name": "total_minted", "type": "u64" },
+        { "name": "timestamp", "type": "i64" }
+      ]
+    },
+    {
+      "name": "DeployEvent",
+      "discriminator": [38, 80, 216, 152, 93, 117, 66, 0],
+      "fields": [
+        { "name": "authority", "type": "pubkey" },
+        { "name": "round_id", "type": "u64" },
+        { "name": "amount", "type": "u64" },
+        { "name": "squares", "type": "u32" },
+        { "name": "total_deployed", "type": "u64" },
+        { "name": "timestamp", "type": "i64" }
+      ]
+    },
+    {
+      "name": "CheckpointEvent",
+      "discriminator": [54, 237, 169, 161, 81, 0, 202, 205],
+      "fields": [
+        { "name": "miner", "type": "pubkey" },
+        { "name": "round_id", "type": "u64" },
+        { "name": "winning_square", "type": "u64" },
+        { "name": "rewards_sol", "type": "u64" },
+        { "name": "rewards_token", "type": "u64" },
+        { "name": "bot_fee", "type": "u64" },
+        { "name": "is_top_miner", "type": "bool" },
+        { "name": "timestamp", "type": "i64" }
+      ]
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "AmountTooSmall", "msg": "Amount too small" },
+    { "code": 6001, "name": "NotAuthorized", "msg": "Not authorized" },
+    { "code": 6002, "name": "InvalidSquare", "msg": "Invalid square selection" },
+    { "code": 6003, "name": "RoundEnded", "msg": "Round has ended" },
+    { "code": 6004, "name": "RoundNotStarted", "msg": "Round has not started" },
+    { "code": 6005, "name": "InvalidAutomationStrategy", "msg": "Invalid automation strategy" },
+    { "code": 6006, "name": "InsufficientBalance", "msg": "Insufficient balance" },
+    { "code": 6007, "name": "InvalidTimestamp", "msg": "Invalid timestamp" },
+    { "code": 6008, "name": "MustCheckpoint", "msg": "Miner must checkpoint previous round before deploying to new round" },
+    { "code": 6009, "name": "InsufficientRent", "msg": "Insufficient rent" },
+    { "code": 6010, "name": "InvalidDeployment", "msg": "Invalid deployment" },
+    { "code": 6011, "name": "InvalidEndSlot", "msg": "Invalid end slot for entropy var" },
+    { "code": 6012, "name": "EntropyNotFinalized", "msg": "Entropy var not finalized" },
+    { "code": 6013, "name": "InvalidEntropyVar", "msg": "Invalid entropy var address" },
+    { "code": 6014, "name": "EntropyNotConfigured", "msg": "Entropy oracle not configured" },
+    { "code": 6015, "name": "InvalidSwapAccounts", "msg": "Invalid swap accounts provided" },
+    { "code": 6016, "name": "InvalidSwapState", "msg": "Invalid state after swap" },
+    { "code": 6017, "name": "Overflow", "msg": "Arithmetic overflow" },
+    { "code": 6018, "name": "Underflow", "msg": "Arithmetic underflow" },
+    { "code": 6019, "name": "InvalidAmount", "msg": "Invalid amount" },
+    { "code": 6020, "name": "InvalidFeeCollector", "msg": "Invalid fee collector address" },
+    { "code": 6021, "name": "SelfReferral", "msg": "Cannot refer yourself" },
+    { "code": 6022, "name": "InvalidReferral", "msg": "Invalid referral account" },
+    { "code": 6023, "name": "PremineStillActive", "msg": "Premine still active" }
+  ]
+}

@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { runQuery, getQuery, allQuery } from '../../src/utils/database';
 import logger from '../../src/utils/logger';
-import { formatSOL, formatORB, formatUSD } from './formatters';
+import { formatSOL, formatLODE, formatUSD } from './formatters';
 
 /**
  * Notification system for telegram bot users
@@ -102,8 +102,8 @@ export async function notifyMiningCompleted(
 ): Promise<void> {
   const title = won ? '🎉 Mining Win!' : '💰 Mining Complete';
   const message = won
-    ? `You won Round #${roundId}!\n\nRewards:\n• ${formatSOL(solRewards)}\n• ${formatORB(orbRewards)}\n\nCongratulations! 🎊`
-    : `Round #${roundId} complete.\n\nRewards:\n• ${formatSOL(solRewards)}\n• ${formatORB(orbRewards)}`;
+    ? `You won Round #${roundId}!\n\nRewards:\n• ${formatSOL(solRewards)}\n• ${formatLODE(orbRewards)}\n\nCongratulations! 🎊`
+    : `Round #${roundId} complete.\n\nRewards:\n• ${formatSOL(solRewards)}\n• ${formatLODE(orbRewards)}`;
 
   await sendNotification(telegramId, NotificationType.MINING_COMPLETED, title, message);
 }
@@ -120,7 +120,7 @@ export async function notifyRewardsAvailable(
     telegramId,
     NotificationType.REWARDS_AVAILABLE,
     '💎 Rewards Ready to Claim',
-    `You have unclaimed rewards:\n• ${formatSOL(solRewards)}\n• ${formatORB(orbRewards)}\n\nUse /rewards to claim them!`
+    `You have unclaimed rewards:\n• ${formatSOL(solRewards)}\n• ${formatLODE(orbRewards)}\n\nUse /rewards to claim them!`
   );
 }
 
@@ -136,7 +136,7 @@ export async function notifyMotherloadThreshold(
     telegramId,
     NotificationType.MOTHERLOAD_THRESHOLD,
     '🚀 High Motherload Alert',
-    `Current motherload: ${formatORB(motherload)}\n\nThis exceeds your threshold of ${formatORB(threshold)}!\n\nAutomation will deploy if enabled.`
+    `Current motherload: ${formatLODE(motherload)}\n\nThis exceeds your threshold of ${formatLODE(threshold)}!\n\nAutomation will deploy if enabled.`
   );
 }
 
@@ -149,7 +149,7 @@ export async function notifyPriceAlert(
   alertType: 'low' | 'high'
 ): Promise<void> {
   const title = alertType === 'low' ? '📉 Low Price Alert' : '📈 High Price Alert';
-  const message = `ORB price: ${formatUSD(currentPrice)}\n\n${
+  const message = `LODE price: ${formatUSD(currentPrice)}\n\n${
     alertType === 'low' ? '⚠️ Price is below your minimum threshold!' : '✨ Price is high - good time to swap!'
   }`;
 
@@ -217,7 +217,7 @@ export async function notifyRoundCompleted(
     telegramId,
     NotificationType.ROUND_COMPLETED,
     '🏁 Round Complete',
-    `Round #${roundId} has ended.\n\nTotal rewards distributed: ${formatORB(totalRewards)}`
+    `Round #${roundId} has ended.\n\nTotal rewards distributed: ${formatLODE(totalRewards)}`
   );
 }
 

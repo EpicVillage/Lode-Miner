@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { VersionedTransaction, PublicKey } from '@solana/web3.js';
-import { config } from './config';
+import { config, LODE_MULTIPLIER } from './config';
 import { getConnection } from './solana';
 import { getWallet } from './wallet';
 import logger from './logger';
@@ -20,22 +20,22 @@ const FALLBACK_ENDPOINTS = [
 
 let workingEndpoint: string | null = null;
 
-// Get price of ORB in SOL by using quote endpoint
+// Get price of LODE in SOL by using quote endpoint
 // The lite-api doesn't have a /price endpoint, so we derive price from a small quote
-export async function getOrbPrice(): Promise<{ priceInSol: number; priceInUsd: number }> {
+export async function getLodePrice(): Promise<{ priceInSol: number; priceInUsd: number }> {
   // Check cache first
-  const cached = getCachedOrbPrice();
+  const cached = getCachedLodePrice();
   if (cached !== null) return cached;
 
   try {
     // Use retry wrapper for robustness against temporary failures
     const result = await retry(
       async () => {
-        // Request a quote for 1 ORB to SOL to get the current price
-        const oneOrbInLamports = 1e9; // 1 ORB = 1,000,000,000 lamports
+        // Request a quote for 1 LODE to SOL to get the current price
+        const oneOrbInLamports = 1e11; // 1 LODE = 100,000,000,000 (LODE has 11 decimals)
 
         const params = {
-          inputMint: config.orbTokenMint.toBase58(),
+          inputMint: config.lodeTokenMint.toBase58(),
           outputMint: WSOL_MINT,
           amount: oneOrbInLamports.toString(),
           slippageBps: '50',
@@ -76,18 +76,18 @@ export async function getOrbPrice(): Promise<{ priceInSol: number; priceInUsd: n
         }
 
         if (!quote || !quote.outAmount) {
-          throw new Error('Failed to get ORB price quote from all endpoints');
+          throw new Error('Failed to get LODE price quote from all endpoints');
         }
 
-        // Calculate price: (output SOL in lamports) / (input ORB in lamports)
-        // This gives us SOL per ORB
+        // Calculate price: (output SOL in lamports) / (input LODE in lamports)
+        // This gives us SOL per LODE
         const priceInSol = Number(quote.outAmount) / oneOrbInLamports;
 
-        // Get SOL price in USD to calculate ORB price in USD
+        // Get SOL price in USD to calculate LODE price in USD
         const solPriceUsd = await getSolPriceInUsd();
         const priceInUsd = priceInSol * solPriceUsd;
 
-        logger.debug(`ORB Price: ${priceInSol.toFixed(8)} SOL (~$${priceInUsd.toFixed(2)} USD) (from quote: 1 ORB → ${(Number(quote.outAmount) / 1e9).toFixed(8)} SOL)`);
+        logger.debug(`LODE Price: ${priceInSol.toFixed(8)} SOL (~$${priceInUsd.toFixed(2)} USD) (from quote: 1 LODE → ${(Number(quote.outAmount) / 1e9).toFixed(8)} SOL)`);
 
         return {
           priceInSol,
@@ -100,11 +100,11 @@ export async function getOrbPrice(): Promise<{ priceInSol: number; priceInUsd: n
         maxDelayMs: 10000,
         exponentialBase: 2,
       },
-      'ORB Price Fetch'
+      'LODE Price Fetch'
     );
 
     // Cache the result
-    priceCache.orbPrice = {
+    priceCache.lodePrice = {
       priceInSol: result.priceInSol,
       priceInUsd: result.priceInUsd,
       timestamp: Date.now()
@@ -112,14 +112,14 @@ export async function getOrbPrice(): Promise<{ priceInSol: number; priceInUsd: n
 
     return result;
   } catch (error) {
-    logger.error('Failed to fetch ORB price after all retries:', error);
+    logger.error('Failed to fetch LODE price after all retries:', error);
     return { priceInSol: 0, priceInUsd: 0 };
   }
 }
 
 // Price cache to reduce API calls (especially for dashboard)
 interface PriceCache {
-  orbPrice?: { priceInSol: number; priceInUsd: number; timestamp: number };
+  lodePrice?: { priceInSol: number; priceInUsd: number; timestamp: number };
   solPrice?: { priceInUsd: number; timestamp: number };
 }
 
@@ -127,10 +127,10 @@ const priceCache: PriceCache = {};
 const PRICE_CACHE_DURATION_MS = 2 * 60 * 1000; // 2 minutes cache
 
 // Get cached price if available and not expired
-function getCachedOrbPrice(): { priceInSol: number; priceInUsd: number } | null {
-  if (priceCache.orbPrice && Date.now() - priceCache.orbPrice.timestamp < PRICE_CACHE_DURATION_MS) {
-    logger.debug(`Using cached ORB price (age: ${Math.floor((Date.now() - priceCache.orbPrice.timestamp) / 1000)}s)`);
-    return { priceInSol: priceCache.orbPrice.priceInSol, priceInUsd: priceCache.orbPrice.priceInUsd };
+function getCachedLodePrice(): { priceInSol: number; priceInUsd: number } | null {
+  if (priceCache.lodePrice && Date.now() - priceCache.lodePrice.timestamp < PRICE_CACHE_DURATION_MS) {
+    logger.debug(`Using cached LODE price (age: ${Math.floor((Date.now() - priceCache.lodePrice.timestamp) / 1000)}s)`);
+    return { priceInSol: priceCache.lodePrice.priceInSol, priceInUsd: priceCache.lodePrice.priceInUsd };
   }
   return null;
 }
@@ -230,7 +230,7 @@ async function tryGetQuote(
       timeout: 20000, // Increased from 15s to 20s for better reliability
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'ORB-Mining-Bot/1.0', // Identify as bot to avoid rate limiting
+        'User-Agent': 'LODE-Mining-Bot/1.0', // Identify as bot to avoid rate limiting
       },
     });
 
@@ -262,17 +262,17 @@ async function tryGetQuote(
   }
 }
 
-// Get swap quote from Jupiter (ORB -> SOL) with automatic fallback
+// Get swap quote from Jupiter (LODE -> SOL) with automatic fallback
 export async function getSwapQuote(
   inputAmount: number,
   slippageBps?: number
 ): Promise<JupiterQuote | null> {
   try {
-    // Convert ORB amount to lamports (ORB has 9 decimals)
-    const inputAmountLamports = Math.floor(inputAmount * 1e9);
+    // Convert LODE amount to lamports (LODE has 11 decimals)
+    const inputAmountLamports = Math.floor(inputAmount * LODE_MULTIPLIER);
 
     const params = {
-      inputMint: config.orbTokenMint.toBase58(),
+      inputMint: config.lodeTokenMint.toBase58(),
       outputMint: WSOL_MINT,
       amount: inputAmountLamports.toString(),
       slippageBps: (slippageBps || config.slippageBps).toString(),
@@ -286,7 +286,7 @@ export async function getSwapQuote(
     if (workingEndpoint) {
       const quote = await tryGetQuote(workingEndpoint, params);
       if (quote) {
-        logger.info(`Quote: ${inputAmount} ORB → ${Number(quote.outAmount) / 1e9} SOL (impact: ${quote.priceImpactPct}%)`);
+        logger.info(`Quote: ${inputAmount} LODE → ${Number(quote.outAmount) / 1e9} SOL (impact: ${quote.priceImpactPct}%)`);
         return quote;
       }
       // If cached endpoint fails, clear it
@@ -297,7 +297,7 @@ export async function getSwapQuote(
     // Try primary endpoint from config
     const primaryQuote = await tryGetQuote(config.jupiterApiUrl, params);
     if (primaryQuote) {
-      logger.info(`Quote: ${inputAmount} ORB → ${Number(primaryQuote.outAmount) / 1e9} SOL (impact: ${primaryQuote.priceImpactPct}%)`);
+      logger.info(`Quote: ${inputAmount} LODE → ${Number(primaryQuote.outAmount) / 1e9} SOL (impact: ${primaryQuote.priceImpactPct}%)`);
       return primaryQuote;
     }
 
@@ -310,7 +310,7 @@ export async function getSwapQuote(
       const quote = await tryGetQuote(fallbackUrl, params);
       if (quote) {
         logger.info(`✅ Fallback successful: ${fallbackUrl}`);
-        logger.info(`Quote: ${inputAmount} ORB → ${Number(quote.outAmount) / 1e9} SOL (impact: ${quote.priceImpactPct}%)`);
+        logger.info(`Quote: ${inputAmount} LODE → ${Number(quote.outAmount) / 1e9} SOL (impact: ${quote.priceImpactPct}%)`);
         logger.info(`💡 Consider updating .env: JUPITER_API_URL=${fallbackUrl}`);
         return quote;
       }
@@ -352,9 +352,9 @@ export async function executeSwap(quote: JupiterQuote, walletKeypair?: any): Pro
       try {
         const feeLevel = parseFeeLevel(config.priorityFeeLevel);
 
-        // Estimate fee for swap (use ORB and SOL token accounts)
+        // Estimate fee for swap (use LODE and SOL token accounts)
         const accounts = [
-          config.orbTokenMint,
+          config.lodeTokenMint,
           new PublicKey(WSOL_MINT),
           wallet.publicKey,
         ];
@@ -429,17 +429,17 @@ export async function executeSwap(quote: JupiterQuote, walletKeypair?: any): Pro
   }
 }
 
-// Swap ORB to SOL (convenience function)
-export async function swapOrbToSol(
-  orbAmount: number,
+// Swap LODE to SOL (convenience function)
+export async function swapLodeToSol(
+  lodeAmount: number,
   slippageBps?: number,
   walletKeypair?: any
 ): Promise<{ success: boolean; signature?: string; solReceived?: number }> {
   try {
-    logger.info(`Swapping ${orbAmount} ORB to SOL...`);
+    logger.info(`Swapping ${lodeAmount} LODE to SOL...`);
 
     // Get quote
-    const quote = await getSwapQuote(orbAmount, slippageBps);
+    const quote = await getSwapQuote(lodeAmount, slippageBps);
     if (!quote) {
       return { success: false };
     }
@@ -464,10 +464,16 @@ export async function swapOrbToSol(
   }
 }
 
+// Backwards compatibility aliases
+export const getOrbPrice = getLodePrice;
+export const swapOrbToSol = swapLodeToSol;
+
 export default {
-  getOrbPrice,
+  getLodePrice,
+  getOrbPrice, // alias
   getSolPriceInUsd,
   getSwapQuote,
   executeSwap,
-  swapOrbToSol,
+  swapLodeToSol,
+  swapOrbToSol, // alias
 };

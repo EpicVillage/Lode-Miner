@@ -1,6 +1,6 @@
 import { InlineKeyboardMarkup } from 'telegraf/types';
 import { getUserSettings, updateUserSetting, resetUserSettings, UserSettings } from './userSettings';
-import { formatSOL, formatORB } from './formatters';
+import { formatSOL, formatLODE } from './formatters';
 
 /**
  * Interactive settings configuration for telegram bot
@@ -29,7 +29,7 @@ export const SETTING_CATEGORIES = {
         type: 'number' as const,
         min: 0,
         max: 1000,
-        unit: 'ORB',
+        unit: 'LODE',
       },
       {
         key: 'sol_per_block' as keyof UserSettings,
@@ -74,21 +74,21 @@ export const SETTING_CATEGORIES = {
       },
       {
         key: 'auto_claim_orb_threshold' as keyof UserSettings,
-        name: 'Auto-Claim ORB Threshold',
-        description: 'Min ORB to auto-claim',
+        name: 'Auto-Claim LODE Threshold',
+        description: 'Min LODE to auto-claim',
         type: 'number' as const,
         min: 0,
         max: 10000,
-        unit: 'ORB',
+        unit: 'LODE',
       },
       {
         key: 'auto_claim_staking_threshold' as keyof UserSettings,
         name: 'Auto-Claim Staking Threshold',
-        description: 'Min staking ORB to auto-claim',
+        description: 'Min staking LODE to auto-claim',
         type: 'number' as const,
         min: 0,
         max: 10,
-        unit: 'ORB',
+        unit: 'LODE',
       },
     ],
   },
@@ -98,21 +98,21 @@ export const SETTING_CATEGORIES = {
       {
         key: 'auto_swap_enabled' as keyof UserSettings,
         name: 'Auto-Swap',
-        description: 'Enable automatic ORB to SOL swapping',
+        description: 'Enable automatic LODE to SOL swapping',
         type: 'boolean' as const,
       },
       {
         key: 'swap_threshold' as keyof UserSettings,
         name: 'Swap Threshold',
-        description: 'Min ORB balance to trigger swap',
+        description: 'Min LODE balance to trigger swap',
         type: 'number' as const,
         min: 0,
         max: 1000,
-        unit: 'ORB',
+        unit: 'LODE',
       },
       {
         key: 'min_orb_price' as keyof UserSettings,
-        name: 'Min ORB Price',
+        name: 'Min LODE Price',
         description: 'Minimum price to allow swap (dump protection)',
         type: 'number' as const,
         min: 0,
@@ -121,12 +121,12 @@ export const SETTING_CATEGORIES = {
       },
       {
         key: 'min_orb_to_keep' as keyof UserSettings,
-        name: 'Min ORB to Keep',
-        description: 'Always keep this much ORB',
+        name: 'Min LODE to Keep',
+        description: 'Always keep this much LODE',
         type: 'number' as const,
         min: 0,
         max: 50,
-        unit: 'ORB',
+        unit: 'LODE',
       },
       {
         key: 'min_swap_amount' as keyof UserSettings,
@@ -135,7 +135,7 @@ export const SETTING_CATEGORIES = {
         type: 'number' as const,
         min: 1,
         max: 10000,
-        unit: 'ORB',
+        unit: 'LODE',
       },
       {
         key: 'slippage_bps' as keyof UserSettings,
@@ -154,17 +154,17 @@ export const SETTING_CATEGORIES = {
       {
         key: 'auto_stake_enabled' as keyof UserSettings,
         name: 'Auto-Stake',
-        description: 'Enable automatic ORB staking',
+        description: 'Enable automatic LODE staking',
         type: 'boolean' as const,
       },
       {
         key: 'stake_threshold' as keyof UserSettings,
         name: 'Stake Threshold',
-        description: 'Min ORB to trigger auto-stake',
+        description: 'Min LODE to trigger auto-stake',
         type: 'number' as const,
         min: 0,
         max: 500,
-        unit: 'ORB',
+        unit: 'LODE',
       },
     ],
   },
@@ -174,17 +174,17 @@ export const SETTING_CATEGORIES = {
       {
         key: 'auto_transfer_enabled' as keyof UserSettings,
         name: 'Auto-Transfer',
-        description: 'Enable automatic ORB transfers',
+        description: 'Enable automatic LODE transfers',
         type: 'boolean' as const,
       },
       {
         key: 'orb_transfer_threshold' as keyof UserSettings,
         name: 'Transfer Threshold',
-        description: 'Min ORB balance to trigger transfer',
+        description: 'Min LODE balance to trigger transfer',
         type: 'number' as const,
         min: 1,
         max: 1000,
-        unit: 'ORB',
+        unit: 'LODE',
       },
     ],
   },
